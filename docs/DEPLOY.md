@@ -230,20 +230,27 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ## Dados analíticos na VPS
 
 O Postgres guarda o histórico operacional (`operation_runs`) e a saúde do
-serviço. A série exibida na web vem da **trilha global**, persistida no volume
+serviço. A série exibida na web vem do **agregado global**, persistido no volume
 `api_data`:
 
-- `data/db/global.sqlite` — focos e clusters mundiais;
+- `data/db/aggregates.sqlite` — agregado célula × ano × mês × sensor, fatores de
+  calibração e amostra de focos recentes (caminho do painel);
+- `data/db/global.sqlite` — focos e clusters linha a linha (trilha legada);
 - `data/runtime/global-*.json` — grade, calibração, status e checkpoints;
 - `data/raw/global/` — CSVs originais da FIRMS.
 
-O globo da home consome `/api/global/hotspots` e o painel
-`/api/global/regions` + `/api/global/calendar`. O dataset Brasil
+O painel consome `/api/global/aggregates` (todas as células) e
+`/api/global/hotspots` (amostra recente). O ano corrente vem da disponibilidade
+do FIRMS e é exibido mesmo antes da consolidação no agregado. O dataset Brasil
 (`data/db/firms.sqlite` + `data/real/`) e os endpoints `/api/hotspots`,
 `/api/regions` e `/api/calendar` continuam disponíveis para compatibilidade; a
 variável `DATA_SOURCE` controla apenas essa trilha legada.
 
-### Carga histórica global
+> O backup diário do `db-backup` cobre só o Postgres. `aggregates.sqlite` é
+> derivado dos CSVs e pode ser regerado; para preservá-lo, copie o volume
+> `api_data` ou mantenha os CSVs.
+
+### Download histórico global
 
 A carga completa tem **10.095 arquivos (~43,5 GB)** e é retomável. Valide o
 plano e o piloto primeiro:
@@ -260,7 +267,7 @@ docker exec carcara-orbit-api-1 npm run global -- \
   --countries all --grid 10 --max-files 20
 ```
 
-Para a carga completa, rode em um container separado: um deploy da API
+Para o download completo, rode em um container separado: um deploy da API
 recreia o container e mataria o processo. O container abaixo compartilha o
 volume e sobrevive aos deploys:
 
@@ -272,6 +279,9 @@ docker run -d --name carcara-global-ingest \
     > /app/data/runtime/global-full.log 2>&1'
 ```
 
+> A importação linha a linha do `npm run global` é legada e não é necessária
+> para o painel; o caminho atual é baixar os CSVs e rodar o agregado DuckDB.
+
 Acompanhe:
 
 ```bash
@@ -279,26 +289,41 @@ docker exec carcara-global-ingest tail -f /app/data/runtime/global-full.log
 curl https://$APP_HOST/api/global/status
 ```
 
-Alternativa em lotes, pelo CLI (retomável; repita até completar):
+### Agregado global (DuckDB)
+
+Depois do download, gere o agregado compacto em um container isolado (não
+interrompe a API e sobrevive a deploys):
 
 ```bash
-docker exec carcara-orbit-api-1 npm run global -- \
-  --countries all --grid 10 --max-files 200
+cd ~/dev/carcara-orbit
+
+docker run --rm --name carcara-global-aggregate \
+  --ulimit nofile=65536:65536 \
+  -v carcara-orbit_api_data:/data \
+  -v "$PWD/api/scripts:/scripts:ro" \
+  python:3.12-slim \
+  sh -c 'pip install --quiet duckdb && python /scripts/global_aggregate.py \
+    --raw /data/raw/global \
+    --regions /data/runtime/global-regions.json \
+    --out /data/db/aggregates.sqlite \
+    --tmp /data/db/duckdb-tmp \
+    --threads 4 --memory-limit 6GB'
 ```
 
-Também é possível disparar pela API (defina `ADMIN_TOKEN` antes de expor o
-endpoint):
+- `--max-files 60` faz um piloto rápido; sem ele, lê os ~43 GB.
+- `--points-per-cell` (padrão 100) controla a amostra usada pelo mapa.
+- O job lê os CSVs em streaming e substitui `aggregates.sqlite` ao final.
+
+Confira:
 
 ```bash
-curl -X POST https://$APP_HOST/api/global/ingest \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
-  -d '{"countries":"all","gridDegrees":10}'
+curl https://$APP_HOST/api/global/aggregates | head -c 300
+docker exec carcara-orbit-api-1 ls -lh /app/data/db/aggregates.sqlite
 ```
 
-A ingestão atualiza `data/db/global.sqlite`, `data/runtime/global-download.json`
-e `data/runtime/global-ingestion.json`. O caminho para PostGIS e escala está em
-[`REQUISITOS.md`](./REQUISITOS.md).
+A trilha legada de ingestão atualiza `data/db/global.sqlite`,
+`data/runtime/global-download.json` e `data/runtime/global-ingestion.json`. O
+caminho para PostGIS e escala está em [`REQUISITOS.md`](./REQUISITOS.md).
 
 > O comando `npm run bootstrap` continua disponível para a trilha Brasil
 > (endpoints legados), mas não é mais necessário para a web.

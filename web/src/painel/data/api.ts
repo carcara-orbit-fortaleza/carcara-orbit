@@ -290,6 +290,8 @@ function aggregateMeta(aggregate: ApiAggregates): DatasetMeta {
       : years.length
         ? Math.max(...years)
         : new Date().getFullYear()
+  const lastCompleteYear =
+    aggregate.lastCompleteYear ?? (years.length ? Math.max(...years) : null)
   return {
     mode: 'real',
     methodVersion: aggregate.methodVersion ?? 'h1.0',
@@ -298,10 +300,9 @@ function aggregateMeta(aggregate: ApiAggregates): DatasetMeta {
     baselineFrom: aggregate.baselineFrom ?? 2003,
     baselineTo: aggregate.baselineTo ?? 2025,
     calibrationWindow: aggregate.calibrationWindow ?? '',
-    periodStart: years.length ? String(years[0]) : null,
-    periodEnd: years.length ? String(years[years.length - 1]) : null,
-    lastCompleteYear:
-      aggregate.lastCompleteYear ?? (years.length ? Math.max(...years) : null),
+    periodStart: years.length ? `${years[0]}-01-01` : null,
+    periodEnd: lastCompleteYear !== null ? `${lastCompleteYear}-12-31` : null,
+    lastCompleteYear,
     warnings: aggregate.warnings ?? [],
   }
 }

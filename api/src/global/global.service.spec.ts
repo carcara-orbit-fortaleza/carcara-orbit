@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { GlobalService } from './global.service.js';
+import { GlobalService, latestFirmsYear } from './global.service.js';
 
 const temp = mkdtempSync(join(tmpdir(), 'carcara-global-service-'));
 const saved = {
@@ -191,5 +191,23 @@ describe('GlobalService', () => {
     expect(csv.body.charCodeAt(0)).toBe(0xfeff);
     expect(csv.body).toContain('region_name');
     expect(csv.body.trim().split(/\r?\n/).length).toBe(3);
+  });
+});
+
+describe('latestFirmsYear', () => {
+  it('picks the latest MODIS/VIIRS date from the availability CSV', () => {
+    const csv = [
+      'data_id,min_date,max_date',
+      'MODIS_NRT,2026-09-01,2026-11-15',
+      'MODIS_SP,2000-11-01,2026-08-31',
+      'VIIRS_NOAA20_SP,2018-04-01,2026-07-31',
+      'LANDSAT_NRT,2022-06-20,2027-01-01',
+    ].join('\n');
+    expect(latestFirmsYear(csv)).toBe(2026);
+  });
+
+  it('returns null when no MODIS/VIIRS row has a date', () => {
+    expect(latestFirmsYear('data_id,min_date,max_date\nLANDSAT_NRT,,')).toBeNull();
+    expect(latestFirmsYear('data_id,min_date,max_date')).toBeNull();
   });
 });

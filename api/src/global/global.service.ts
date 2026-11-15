@@ -34,8 +34,28 @@ const REGION_LIMIT = 200;
 const REGION_MAX_LIMIT = 2000;
 const HOTSPOT_LIMIT = 5000;
 const HOTSPOT_MAX_LIMIT = 50000;
+const FIRMS_AVAILABILITY_URL =
+  'https://firms.modaps.eosdis.nasa.gov/api/data_availability/csv';
+const FIRMS_YEAR_TTL_MS = 6 * 60 * 60 * 1000;
+const FIRMS_YEAR_RETRY_MS = 5 * 60 * 1000;
 const SEPARATOR = ';';
 const BOM = '﻿';
+
+/**
+ * Maior ano com dados entre as fontes MODIS/VIIRS da disponibilidade do FIRMS.
+ * A resposta é um CSV `data_id,min_date,max_date`, uma linha por fonte.
+ */
+export function latestFirmsYear(csv: string): number | null {
+  let latest = '';
+  for (const line of csv.split(/\r?\n/).slice(1)) {
+    const [id, , maxDate] = line.split(',');
+    if (!id || !maxDate) continue;
+    if (!/^(MODIS|VIIRS)_/.test(id)) continue;
+    if (maxDate > latest) latest = maxDate;
+  }
+  const year = Number(latest.slice(0, 4));
+  return Number.isInteger(year) && year >= FIRST_YEAR ? year : null;
+}
 
 function decimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return '';
@@ -236,6 +256,33 @@ export class GlobalService {
   private regionsCache: { mtimeMs: number; data: GlobalRegionsFile } | null = null;
   private calibrationCache: { mtimeMs: number; data: GlobalCalibration } | null =
     null;
+  private firmsYearCache: { year: number | null; at: number } | null = null;
+
+  /** Ano corrente segundo a disponibilidade do FIRMS, com cache curto. */
+  private async firmsCurrentYear(): Promise<number | null> {
+    const now = Date.now();
+    const cached = this.firmsYearCache;
+    const ttl = cached?.year === null ? FIRMS_YEAR_RETRY_MS : FIRMS_YEAR_TTL_MS;
+    if (cached && now - cached.at < ttl) return cached.year;
+    const key = process.env.FIRMS_MAP_KEY;
+    if (!key) {
+      this.firmsYearCache = { year: null, at: now };
+      return null;
+    }
+    try {
+      const response = await fetch(
+        `${FIRMS_AVAILABILITY_URL}/${encodeURIComponent(key)}/all`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const year = latestFirmsYear(await response.text());
+      this.firmsYearCache = { year, at: now };
+      return year;
+    } catch {
+      this.firmsYearCache = { year: null, at: now };
+      return null;
+    }
+  }
 
   /** Status of the global database, grid and ingestion job. */
   status() {
@@ -270,13 +317,14 @@ export class GlobalService {
    * Compact harmonized calendar aggregate: every grid cell with monthly
    * MODIS/VIIRS/harmonized counts and calibration factors.
    */
-  aggregates() {
+  async aggregates() {
     const path = this.paths.aggregatesFile;
     if (!existsSync(path)) {
       throw new ServiceUnavailableException(
         'O agregado global ainda não foi gerado. Rode o job de agregação (DuckDB).',
       );
     }
+    const firmsYear = await this.firmsCurrentYear();
     let db: DatabaseSync | null = null;
     try {
       db = new DatabaseSync(path, { readOnly: true });
@@ -286,9 +334,17 @@ export class GlobalService {
         .all() as Array<{ key: string; value: string }>;
       const meta = Object.fromEntries(metaRows.map((row) => [row.key, row.value]));
       const yearsMin = Number(meta.years_min ?? 2000);
-      const yearsMax = Number(meta.years_max ?? 2025);
+      const dataYearsMax = Number(meta.years_max ?? 2025);
+      // O agregado cobre só anos consolidados; o FIRMS informa o ano corrente
+      // (NRT), que entra no calendário como coluna ainda sem dados.
+      const currentYear = Math.min(
+        new Date().getUTCFullYear(),
+        LAST_YEAR,
+        Math.max(dataYearsMax, firmsYear ?? dataYearsMax),
+      );
+      const lastYear = Math.max(dataYearsMax, currentYear);
       const years = Array.from(
-        { length: Math.max(0, yearsMax - yearsMin + 1) },
+        { length: Math.max(0, lastYear - yearsMin + 1) },
         (_, index) => yearsMin + index,
       );
       const cellRows = db
@@ -373,12 +429,28 @@ export class GlobalService {
         (a, b) => b.hotspots - a.hotspots || a.name.localeCompare(b.name),
       );
 
+      const baselineFrom = Math.max(
+        FIRST_YEAR,
+        Number(process.env.BASELINE_START_YEAR ?? 2003),
+      );
+      const baselineTo = Math.min(
+        dataYearsMax,
+        currentYear - 1,
+        Number(process.env.BASELINE_END_YEAR ?? 2025),
+      );
+
       return {
         scope: 'global',
         gridDegrees: Number(meta.grid_degrees ?? 10),
         years,
         months: MONTHS,
         methodVersion: meta.method_version ?? 'h1.0',
+        datasetVersion: meta.method_version ?? 'h1.0',
+        currentYear,
+        baselineFrom,
+        baselineTo,
+        lastCompleteYear: Math.min(dataYearsMax, currentYear - 1),
+        warnings: [],
         calibrationWindow: meta.calibration_window ?? null,
         disclaimer:
           meta.disclaimer ??

@@ -107,12 +107,21 @@ def main() -> int:
     con.execute(f"SET temp_directory = {sql_quote(args.tmp)};")
     con.execute("SET preserve_insertion_order = false;")
 
-    file_list = "[" + ", ".join(sql_quote(path) for path in files) + "]"
-    log("Lendo CSVs com DuckDB (streaming, colunar)...")
+    modis_files = [
+        path
+        for path in files
+        if os.path.basename(os.path.dirname(path)).startswith("MODIS")
+    ]
+    viirs_files = [
+        path
+        for path in files
+        if not os.path.basename(os.path.dirname(path)).startswith("MODIS")
+    ]
+    log(f"{len(modis_files)} arquivos MODIS · {len(viirs_files)} arquivos VIIRS")
 
-    con.execute(
-        f"""
-        CREATE OR REPLACE TEMP VIEW raw AS
+    def read_family(paths: list[str], brightness_column: str, sensor: str) -> str:
+        listing = "[" + ", ".join(sql_quote(path) for path in paths) + "]"
+        return f"""
         SELECT
           TRY_CAST(latitude AS DOUBLE) AS lat,
           TRY_CAST(longitude AS DOUBLE) AS lon,
@@ -120,18 +129,16 @@ def main() -> int:
           TRY_CAST(acq_time AS INTEGER) AS acq_time,
           lower(trim(CAST(confidence AS VARCHAR))) AS confidence_raw,
           TRY_CAST(frp AS DOUBLE) AS frp_mw,
-          COALESCE(
-            TRY_CAST(brightness AS DOUBLE),
-            TRY_CAST(bright_ti4 AS DOUBLE)
-          ) AS brightness_k,
+          TRY_CAST({brightness_column} AS DOUBLE) AS brightness_k,
           CAST(satellite AS VARCHAR) AS satellite,
           CAST(instrument AS VARCHAR) AS instrument,
           lower(trim(CAST(daynight AS VARCHAR))) AS daynight_raw,
           trim(CAST(type AS VARCHAR)) AS type_raw,
           regexp_extract(filename, '/([^/]+)/[^/]+$', 1) AS source,
-          filename
+          filename,
+          '{sensor}' AS sensor
         FROM read_csv(
-          {file_list},
+          {listing},
           header = true,
           union_by_name = true,
           filename = true,
@@ -141,6 +148,15 @@ def main() -> int:
           AND longitude IS NOT NULL
           AND acq_date IS NOT NULL
         """
+
+    parts: list[str] = []
+    if modis_files:
+        parts.append(read_family(modis_files, "brightness", "MODIS"))
+    if viirs_files:
+        parts.append(read_family(viirs_files, "bright_ti4", "VIIRS"))
+    log("Lendo CSVs com DuckDB (streaming, colunar)...")
+    con.execute(
+        "CREATE OR REPLACE TEMP VIEW raw AS " + " UNION ALL ".join(parts)
     )
 
     log("Normalizando e filtrando (MODIS/VIIRS, confiança, tipo)...")
@@ -148,13 +164,19 @@ def main() -> int:
         f"""
         CREATE OR REPLACE TEMP VIEW filtered AS
         SELECT
-          'g_' || CASE WHEN lat_band >= 0 THEN 'n' ELSE 's' END
-                || CAST(abs(lat_band) AS VARCHAR)
-                || '_'
-                || CASE WHEN lon_band >= 0 THEN 'e' ELSE 'w' END
-                || CAST(abs(lon_band) AS VARCHAR) AS cell_id,
+          'g_'
+          || CASE
+               WHEN lat_band = 0 THEN '0'
+               WHEN lat_band < 0 THEN 's' || CAST(-lat_band AS VARCHAR)
+               ELSE 'n' || CAST(lat_band AS VARCHAR)
+             END
+          || '_'
+          || CASE
+               WHEN lon_band = 0 THEN '0'
+               WHEN lon_band < 0 THEN 'w' || CAST(-lon_band AS VARCHAR)
+               ELSE 'e' || CAST(lon_band AS VARCHAR)
+             END AS cell_id,
           *,
-          CASE WHEN source LIKE 'MODIS%' THEN 'MODIS' ELSE 'VIIRS' END AS sensor,
           CASE
             WHEN source LIKE 'MODIS%' THEN
               CASE
@@ -198,19 +220,28 @@ def main() -> int:
         FROM (
           SELECT
             *,
-            CAST(floor((lat + 90) / {args.grid}) * {args.grid} AS INTEGER) AS lat_band,
-            CAST(floor((lon + 180) / {args.grid}) * {args.grid} - 180 AS INTEGER) AS lon_band,
-            CAST(strptime(acq_date, '%Y-%m-%d') AS DATE) AS acq_dt,
-            CAST(year(strptime(acq_date, '%Y-%m-%d')) AS INTEGER) AS year,
-            CAST(month(strptime(acq_date, '%Y-%m-%d')) AS INTEGER) AS month,
+            CAST(
+              floor((LEAST(89.999999, GREATEST(-89.999999, lat)) + 90) / {args.grid})
+              * {args.grid} - 90
+              AS INTEGER
+            ) AS lat_band,
+            CAST(
+              floor((LEAST(179.999999, GREATEST(-179.999999, lon)) + 180) / {args.grid})
+              * {args.grid} - 180
+              AS INTEGER
+            ) AS lon_band,
+            CAST(TRY_STRPTIME(acq_date, '%Y-%m-%d') AS DATE) AS acq_dt,
+            CAST(year(TRY_STRPTIME(acq_date, '%Y-%m-%d')) AS INTEGER) AS year,
+            CAST(month(TRY_STRPTIME(acq_date, '%Y-%m-%d')) AS INTEGER) AS month,
             epoch_ms(
-              CAST(strptime(acq_date, '%Y-%m-%d') AS TIMESTAMP)
-              + INTERVAL (acq_time // 100) HOUR
-              + INTERVAL (acq_time % 100) MINUTE
+              CAST(TRY_STRPTIME(acq_date, '%Y-%m-%d') AS TIMESTAMP)
+              + INTERVAL (COALESCE(acq_time, 0) // 100) HOUR
+              + INTERVAL (COALESCE(acq_time, 0) % 100) MINUTE
             ) AS ts_ms
           FROM raw
         ) t
-        WHERE (
+        WHERE year IS NOT NULL
+        AND (
           (source LIKE 'MODIS%' AND TRY_CAST(confidence_raw AS INTEGER) >= {args.min_modis_confidence})
           OR (
             source NOT LIKE 'MODIS%'
@@ -221,8 +252,8 @@ def main() -> int:
         """
     )
 
-    # The duplicate confidence_class column above is intentional only to keep
-    # the derived columns grouped; drop it so the views below stay explicit.
+    # Expõe só as colunas normalizadas; a ordem abaixo é a usada pelos
+    # agregados e pela amostra de pontos recentes.
     con.execute(
         """
         CREATE OR REPLACE TEMP VIEW filtered_clean AS
@@ -334,8 +365,9 @@ def main() -> int:
           SELECT
             sensor || '-' || substr(md5(concat_ws(
               '|', sensor, CAST(ts_ms AS VARCHAR), CAST(lat AS VARCHAR),
-              CAST(lon AS VARCHAR), platform
-            )), 1, 12) AS id,
+              CAST(lon AS VARCHAR), platform, CAST(frp_mw AS VARCHAR),
+              CAST(brightness_k AS VARCHAR)
+            )), 1, 16) AS id,
             cell_id,
             lat,
             lon,
@@ -494,7 +526,7 @@ def main() -> int:
             """
         ).fetchall()
         db.executemany(
-            "INSERT INTO recent_points VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO recent_points VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             points,
         )
 

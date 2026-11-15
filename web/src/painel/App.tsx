@@ -200,7 +200,7 @@ export default function App() {
 
             <section className="kpis" aria-label="Indicadores principais">
               <Kpi label={`Focos em ${board.currentYear}`} value={formatCount(board.currentTotal)} unit="focos" foot="último ano com dados" delta={signed(board.currentAnomaly) + '%'} up={board.currentAnomaly >= 0} accent="var(--ember)" />
-              <Kpi label={`Anomalia ${board.currentYear}`} value={`${signed(board.currentAnomaly)}%`} foot="vs. média 2003–2025" delta={board.currentAnomaly >= 0 ? 'acima' : 'abaixo'} up={board.currentAnomaly >= 0} accent="var(--amber)" />
+              <Kpi label={`Anomalia ${board.currentYear}`} value={`${signed(board.currentAnomaly)}%`} foot={`vs. média ${board.trendWindow}`} delta={board.currentAnomaly >= 0 ? 'acima' : 'abaixo'} up={board.currentAnomaly >= 0} accent="var(--amber)" />
               <Kpi label="Pico histórico" value={String(board.peakYear)} foot={`${formatCount(board.peakTotal)} focos · ano completo`} delta="máximo" accent="var(--danger)" />
               <Kpi label="Tendência" value={`${signed(board.trend)}%`} unit="/década" foot={`${board.trendWindow} · regressão linear`} delta={board.trend >= 0 ? 'alta' : 'queda'} up={board.trend >= 0} accent="var(--teal)" />
             </section>
@@ -232,7 +232,7 @@ export default function App() {
                     <div><dt>Janela de calibração</dt><dd>2012—2025</dd></div>
                     <div><dt>Fator da célula</dt><dd>×{board.factor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
                     <div><dt>Incerteza estimada</dt><dd>±{Math.round(board.uncertainty)}%</dd></div>
-                    <div><dt>Baseline</dt><dd>2003—2025</dd></div>
+                    <div><dt>Baseline</dt><dd>{board.trendWindow}</dd></div>
                   </dl>
                   <button className="link" type="button" onClick={() => methodRef.current?.showModal()}>Como funciona a harmonização</button>
                 </article>

@@ -1,0 +1,296 @@
+{
+ "type": "FeatureCollection",
+ "name": "carcara-orbit-regioes-mock",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "amazonia",
+    "name": "Amazônia",
+    "biome": "Floresta tropical",
+    "area_km2": 4196943,
+    "color": "#3E8E63"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -73.5,
+       -9.2
+      ],
+      [
+       -72.0,
+       -5.0
+      ],
+      [
+       -69.5,
+       -1.5
+      ],
+      [
+       -67.0,
+       2.2
+      ],
+      [
+       -62.0,
+       4.6
+      ],
+      [
+       -56.0,
+       3.2
+      ],
+      [
+       -51.5,
+       1.0
+      ],
+      [
+       -50.0,
+       -2.5
+      ],
+      [
+       -52.5,
+       -7.5
+      ],
+      [
+       -55.5,
+       -11.5
+      ],
+      [
+       -60.0,
+       -13.5
+      ],
+      [
+       -65.0,
+       -12.5
+      ],
+      [
+       -70.0,
+       -12.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "cerrado",
+    "name": "Cerrado",
+    "biome": "Savana tropical",
+    "area_km2": 2036448,
+    "color": "#C98A2E"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -60.2,
+       -4.2
+      ],
+      [
+       -55.0,
+       -2.4
+      ],
+      [
+       -47.5,
+       -3.0
+      ],
+      [
+       -43.0,
+       -6.2
+      ],
+      [
+       -44.2,
+       -11.8
+      ],
+      [
+       -47.5,
+       -16.8
+      ],
+      [
+       -53.5,
+       -16.2
+      ],
+      [
+       -57.8,
+       -11.2
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "pantanal",
+    "name": "Pantanal",
+    "biome": "Área úmida",
+    "area_km2": 150355,
+    "color": "#4F9AA8"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -59.2,
+       -15.0
+      ],
+      [
+       -56.0,
+       -14.2
+      ],
+      [
+       -53.8,
+       -16.8
+      ],
+      [
+       -54.6,
+       -20.6
+      ],
+      [
+       -57.8,
+       -21.0
+      ],
+      [
+       -59.2,
+       -18.2
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "caatinga",
+    "name": "Caatinga",
+    "biome": "Floresta seca",
+    "area_km2": 844453,
+    "color": "#A98B5C"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -45.5,
+       -3.0
+      ],
+      [
+       -40.0,
+       -2.8
+      ],
+      [
+       -37.0,
+       -8.0
+      ],
+      [
+       -39.0,
+       -13.0
+      ],
+      [
+       -43.5,
+       -14.2
+      ],
+      [
+       -45.5,
+       -9.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "mata-atlantica",
+    "name": "Mata Atlântica",
+    "biome": "Floresta costeira",
+    "area_km2": 1110182,
+    "color": "#2F7F72"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -44.8,
+       -8.0
+      ],
+      [
+       -39.5,
+       -6.0
+      ],
+      [
+       -35.2,
+       -9.0
+      ],
+      [
+       -38.0,
+       -15.0
+      ],
+      [
+       -42.0,
+       -23.5
+      ],
+      [
+       -48.2,
+       -28.0
+      ],
+      [
+       -50.0,
+       -25.0
+      ],
+      [
+       -46.0,
+       -18.0
+      ],
+      [
+       -44.4,
+       -12.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "pampa",
+    "name": "Pampa",
+    "biome": "Campo subtropical",
+    "area_km2": 176496,
+    "color": "#7E9A4E"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -58.2,
+       -28.0
+      ],
+      [
+       -52.0,
+       -28.2
+      ],
+      [
+       -49.8,
+       -33.2
+      ],
+      [
+       -56.0,
+       -34.2
+      ],
+      [
+       -58.4,
+       -31.0
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

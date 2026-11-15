@@ -1,0 +1,26 @@
+# Version control / CI / docs
+.git
+.github
+**/*.md
+
+# Dependencies and builds
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# Secrets and local config
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs and OS files
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+
+# Generated runtime data (data/mock stays in the image)
+api/data/raw
+api/data/real
+api/data/db
+api/data/runtime

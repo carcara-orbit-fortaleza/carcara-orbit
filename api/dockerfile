@@ -1,0 +1,37 @@
+# ── Base: dependências da API ──────────────────────────────────────────
+# Este Dockerfile é construído a partir da RAIZ do repositório
+# (ver build.context no docker-compose.yml).
+FROM node:24-alpine AS deps
+WORKDIR /app
+COPY api/package.json api/package-lock.json ./
+RUN npm ci
+
+# ── Desenvolvimento: hot reload ────────────────────────────────────────
+FROM deps AS development
+WORKDIR /app
+ENV NODE_ENV=development
+COPY api/ ./
+RUN mkdir -p /app/data/raw /app/data/real /app/data/db /app/data/runtime
+EXPOSE 3000
+CMD ["npm", "run", "start:dev"]
+
+# ── Build: compilação TypeScript ───────────────────────────────────────
+FROM deps AS build
+WORKDIR /app
+COPY api/ ./
+RUN npm run build
+
+# ── Produção: execução compilada, sem devDependencies ──────────────────
+FROM node:24-alpine AS production
+WORKDIR /app
+ENV NODE_ENV=production
+COPY api/package.json api/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+COPY api/pipeline ./pipeline
+COPY api/data/mock ./data/mock
+RUN mkdir -p /app/data/raw /app/data/real /app/data/db /app/data/runtime \
+    && chown -R node:node /app/data
+USER node
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

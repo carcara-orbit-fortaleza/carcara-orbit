@@ -1,0 +1,29 @@
+# ── Desenvolvimento: Vite com HMR ──────────────────────────────────────
+# Este Dockerfile é construído a partir da RAIZ do repositório
+# (ver build.context no docker-compose.yml).
+FROM node:24-alpine AS deps
+WORKDIR /app
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+
+FROM deps AS development
+WORKDIR /app
+COPY web/ ./
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
+
+# ── Build: gera os assets estáticos ────────────────────────────────────
+FROM deps AS build
+WORKDIR /app
+COPY web/ ./
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# ── Produção: nginx serve a SPA e faz proxy de /api ────────────────────
+FROM nginx:alpine AS production
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf.template
+ENV SERVER_UPSTREAM=http://api:3000
+EXPOSE 80
+CMD ["/bin/sh", "-c", "envsubst '$SERVER_UPSTREAM' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

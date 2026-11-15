@@ -1,0 +1,198 @@
+@import 'tailwindcss';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/sora/800.css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * Tokens Carcará Orbit (brief, seção 13.2).
+ * Tema escuro é o padrão. O claro vale com data-theme="light".
+ * Cores de dados ficam em tokens próprios, nunca em literais nos componentes.
+ */
+@theme {
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0e1013; /* carvao */
+  --surface: #15191e; /* painel */
+  --fg: #f2efe8; /* areia */
+  --fg-muted: #9aa1ab; /* cinza, use com contraste >= 4.5:1 sobre --bg */
+  --accent: #f2712b; /* brasas */
+  --accent-2: #f7a03c; /* ambar: picos e alertas positivos */
+  --cerrado: #3e8e63; /* vegetação */
+  --ceu: #6fb3a8; /* anomalia negativa e VIIRS */
+  --alerta: #d2451a; /* anos extremos */
+  --line: #2a3038;
+
+  /* Escala de contagem: luminância crescente, do fundo ao âmbar */
+  --scale-0: #1c2025;
+  --scale-1: #2b3138;
+  --scale-2: #5a4a32;
+  --scale-3: #8a5f2c;
+  --scale-4: #b9742f;
+  --scale-5: #f2712b;
+  --scale-6: #ffc46b;
+
+  /* Anomalia: divergente, teal (abaixo) e laranja (acima), sem vermelho/verde */
+  --anom-neg: #6fb3a8;
+  --anom-zero: #2b3138;
+  --anom-pos: #f2712b;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2efe8;
+  --surface: #ffffff;
+  --fg: #0e1013;
+  --fg-muted: #4b5260;
+  --accent: #b9470f;
+  --accent-2: #8a5a00;
+  --cerrado: #2d6b4a;
+  --ceu: #2f7f74;
+  --alerta: #a3300f;
+  --line: #d6d2c8;
+
+  --scale-0: #f4f1ea;
+  --scale-1: #e3dccd;
+  --scale-2: #cfb98a;
+  --scale-3: #b98f4d;
+  --scale-4: #9e6a2a;
+  --scale-5: #7a3f12;
+  --scale-6: #4a2308;
+
+  --anom-neg: #2f7f74;
+  --anom-zero: #e3dccd;
+  --anom-pos: #b9470f;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: #f2efe8;
+    --surface: #ffffff;
+    --fg: #0e1013;
+    --fg-muted: #4b5260;
+    --accent: #b9470f;
+    --accent-2: #8a5a00;
+    --cerrado: #2d6b4a;
+    --ceu: #2f7f74;
+    --alerta: #a3300f;
+    --line: #d6d2c8;
+    --scale-0: #f4f1ea;
+    --scale-1: #e3dccd;
+    --scale-2: #cfb98a;
+    --scale-3: #b98f4d;
+    --scale-4: #9e6a2a;
+    --scale-5: #7a3f12;
+    --scale-6: #4a2308;
+    --anom-neg: #2f7f74;
+    --anom-zero: #e3dccd;
+    --anom-pos: #b9470f;
+  }
+}
+
+/* Nebulosa suave atrás da abertura. Usa só os tokens do tema, então acompanha o modo claro. */
+.nebula {
+  background-image: radial-gradient(60% 50% at 12% 18%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+}
+
+/* A faixa do hero tem largura da tela (w-screen), que inclui a barra de rolagem.
+   Com html e body cortando o excesso, a página não ganha rolagem horizontal. */
+html {
+  overflow-x: hidden;
+}
+
+/* O fundo fica só no html. Se o body tivesse fundo, ele cobriria o canvas do fundo estelar. */
+html {
+  background: var(--bg);
+}
+
+html,
+body {
+  margin: 0;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Card com estrelas cadentes (StreakCard). Cores e movimento seguem o tema. */
+.streak-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.streak {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  width: 2px;
+  height: var(--len);
+  border-radius: 2px;
+  background: linear-gradient(to bottom, transparent, var(--accent-2), #fff);
+  opacity: 0;
+  filter: blur(0.5px);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-2) 70%, transparent);
+  animation: streak-fall var(--d) linear var(--delay) infinite;
+}
+
+@keyframes streak-fall {
+  0% {
+    transform: translate(0, -30px) rotate(25deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-40px, 220px) rotate(25deg);
+    opacity: 0;
+  }
+}
+
+.streak-card {
+  transition:
+    transform 0.3s,
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+
+.streak-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak {
+    display: none;
+  }
+  .streak-card:hover {
+    transform: none;
+  }
+}

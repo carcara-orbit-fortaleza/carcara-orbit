@@ -1,0 +1,71 @@
+:root {
+  --bg: #0e1013;
+  --panel: #15191e;
+  --panel-2: #1a1f25;
+  --line: rgba(255, 255, 255, 0.085);
+  --line-soft: rgba(255, 255, 255, 0.05);
+  --text: #f2efe8;
+  --muted: #a2a9b2;
+  --dim: #828a95;
+  --ember: #f2712b;
+  --amber: #f7a03c;
+  --sand: #f4f1ea;
+  --teal: #6fb3a8;
+  --danger: #d2451a;
+  --radius: 18px;
+  --mono: "JetBrains Mono", Consolas, monospace;
+  --display: "Sora", "Segoe UI", sans-serif;
+  --body: "Inter", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 18px; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 620px at 82% -12%, rgba(242, 113, 43, 0.11), transparent 62%),
+    radial-gradient(900px 560px at 4% 108%, rgba(111, 179, 168, 0.07), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+button, a { font: inherit; color: inherit; }
+h1, h2 { font-family: var(--display); letter-spacing: -0.01em; }
+p { margin: 0; }
+#root { min-height: 100vh; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Tela de login e barra do painel */
+.painel-status { padding: 48px 16px; text-align: center; color: var(--muted); font-family: var(--body); }
+.painel-login { min-height: 100svh; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px 0; }
+.painel-login-card { width: min(380px, 100%); min-width: 0; box-sizing: border-box; display: grid; gap: 8px; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.painel-login-card h1 { margin: 0; font-family: var(--display); font-size: 22px; }
+.painel-login-lead { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+.painel-login-card label { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.painel-login-card input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; }
+.painel-login-card button { margin-top: 12px; min-height: 44px; padding: 11px; border: 0; border-radius: 10px; background: var(--ember); color: #0e1013; font-weight: 700; cursor: pointer; }
+.painel-login-card button:disabled { opacity: 0.5; cursor: default; }
+.painel-login-error { margin: 6px 0 0; color: var(--danger); font-size: 14px; }
+.painel-topbar { position: sticky; top: 0; z-index: 15; background: var(--bg); display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.painel-topbar button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
+
+.painel-topbar-logo { display: none; height: 24px; width: auto; margin-right: auto; }
+.painel-topbar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 860px) {
+  .painel-topbar { padding: 8px 16px; min-height: 48px; box-sizing: border-box; }
+  .painel-topbar-logo { display: block; }
+  .painel-topbar button { min-height: 36px; }
+}
+@media (max-width: 860px) {
+  /* Âncoras do menu não ficam escondidas atrás da barra do topo. */
+  .app [id] { scroll-margin-top: 64px; }
+}

@@ -1,0 +1,53 @@
+# ── Base: serviços, rede e volumes compartilhados ──────────────────────
+# Dev:  docker compose up
+# Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d
+name: carcara-orbit
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./api/dockerfile
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${API_PORT:-3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+      - DATA_SOURCE=${DATA_SOURCE:-mock}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - FIRMS_MAP_KEY=${FIRMS_MAP_KEY:-}
+      - NRT_ENABLED=${NRT_ENABLED:-false}
+      - NRT_INTERVAL_MINUTES=${NRT_INTERVAL_MINUTES:-180}
+      - NRT_DAYS=${NRT_DAYS:-2}
+      - NRT_REGIONS=${NRT_REGIONS:-}
+      - FIRMS_SOURCES=${FIRMS_SOURCES:-MODIS_NRT,VIIRS_NOAA20_NRT,VIIRS_NOAA21_NRT}
+      - FIRMS_DB_PATH=${FIRMS_DB_PATH:-./data/db/firms.sqlite}
+      - FIRMS_COUNTRY=${FIRMS_COUNTRY:-Brazil}
+      - FIRMS_HISTORY_START_YEAR=${FIRMS_HISTORY_START_YEAR:-2000}
+      - HOTSPOTS_EXPORT_MONTHS=${HOTSPOTS_EXPORT_MONTHS:-24}
+      - PIPELINE_TIMEOUT_MS=${PIPELINE_TIMEOUT_MS:-900000}
+      - MODIS_MIN_CONFIDENCE=${MODIS_MIN_CONFIDENCE:-30}
+      - VIIRS_MIN_CLASS=${VIIRS_MIN_CLASS:-nominal}
+      - CALIBRATION_START_YEAR=${CALIBRATION_START_YEAR:-2012}
+      - CALIBRATION_END_YEAR=${CALIBRATION_END_YEAR:-2025}
+      - BASELINE_START_YEAR=${BASELINE_START_YEAR:-2003}
+      - BASELINE_END_YEAR=${BASELINE_END_YEAR:-2025}
+      - CALIBRATION_MIN_CELLS=${CALIBRATION_MIN_CELLS:-30}
+      - CALIBRATION_SHRINKAGE_K=${CALIBRATION_SHRINKAGE_K:-20}
+      - CALIBRATION_MIN_FACTOR=${CALIBRATION_MIN_FACTOR:-0.5}
+      - CALIBRATION_MAX_FACTOR=${CALIBRATION_MAX_FACTOR:-4.0}
+      - MAX_MAP_POINTS=${MAX_MAP_POINTS:-2000}
+      - MAX_EXPORT_ROWS=${MAX_EXPORT_ROWS:-50000}
+    networks: [app-network]
+
+  web:
+    build:
+      context: .
+      dockerfile: ./web/dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    networks: [app-network]
+    depends_on: [api]
+
+networks:
+  app-network:
+    driver: bridge

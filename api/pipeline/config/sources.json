@@ -1,0 +1,67 @@
+{
+  "sources": {
+    "MODIS_NRT": {
+      "sensor": "MODIS",
+      "resolutionM": 1000,
+      "instrument": "MODIS C6.1",
+      "kind": "nrt",
+      "defaultPlatform": "Terra/Aqua"
+    },
+    "VIIRS_NOAA20_NRT": {
+      "sensor": "VIIRS",
+      "resolutionM": 375,
+      "instrument": "VIIRS 375m",
+      "kind": "nrt",
+      "defaultPlatform": "NOAA-20"
+    },
+    "VIIRS_NOAA21_NRT": {
+      "sensor": "VIIRS",
+      "resolutionM": 375,
+      "instrument": "VIIRS 375m",
+      "kind": "nrt",
+      "defaultPlatform": "NOAA-21"
+    },
+    "MODIS_SP": {
+      "sensor": "MODIS",
+      "resolutionM": 1000,
+      "instrument": "MODIS C6.1",
+      "kind": "archive",
+      "defaultPlatform": "Terra/Aqua"
+    },
+    "VIIRS_SNPP_SP": {
+      "sensor": "VIIRS",
+      "resolutionM": 375,
+      "instrument": "VIIRS 375m",
+      "kind": "archive",
+      "defaultPlatform": "SNPP"
+    },
+    "VIIRS_NOAA20_SP": {
+      "sensor": "VIIRS",
+      "resolutionM": 375,
+      "instrument": "VIIRS 375m",
+      "kind": "archive",
+      "defaultPlatform": "NOAA-20"
+    },
+    "VIIRS_NOAA21_SP": {
+      "sensor": "VIIRS",
+      "resolutionM": 375,
+      "instrument": "VIIRS 375m",
+      "kind": "archive",
+      "defaultPlatform": "NOAA-21"
+    }
+  },
+  "defaultNrtSources": [
+    "MODIS_NRT",
+    "VIIRS_NOAA20_NRT",
+    "VIIRS_NOAA21_NRT"
+  ],
+  "defaultArchiveSources": [
+    "MODIS_SP",
+    "VIIRS_SNPP_SP",
+    "VIIRS_NOAA20_SP",
+    "VIIRS_NOAA21_SP"
+  ],
+  "excludedByDefault": {
+    "VIIRS_SNPP_NRT": "Suomi NPP stopped delivering new data in November 2026; use NOAA-20/NOAA-21."
+  }
+}

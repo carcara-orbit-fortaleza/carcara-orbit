@@ -1,0 +1,69 @@
+# ── Prod: TLS com Traefik, nginx com SPA e proxy /api ──────────────────
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build
+services:
+  traefik:
+    image: traefik:v2.11
+    restart: always
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/traefik/:/data/
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.email=${ADMIN_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/data/acme.json
+    networks: [app-network]
+
+  api:
+    restart: always
+    build:
+      target: production
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - api_data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\"",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # Sem labels do Traefik: a API não é publicada no host. O tráfego
+    # público entra em :443 → web nginx → /api/* → api:3000 (rede interna).
+
+  web:
+    restart: always
+    build:
+      target: production
+      args:
+        VITE_API_URL: /api
+    environment:
+      - SERVER_UPSTREAM=http://api:${API_PORT:-3000}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${APP_HOST:-app.example.com}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=le"
+      - "traefik.http.middlewares.web-secure.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.web-secure.headers.stsIncludeSubdomains=true"
+      - "traefik.http.routers.web.middlewares=web-secure"
+      - "traefik.http.services.web.loadbalancer.server.port=80"
+
+volumes:
+  api_data:

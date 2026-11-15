@@ -67,9 +67,13 @@ export async function loadConfig(overrides = {}) {
   const realDir = path.resolve(overrides.realDir ?? path.join(storageDir, 'real'));
   const configDir = path.join(apiRoot, 'config');
 
+  const regionsFile = path.resolve(
+    overrides.regionsFile ??
+      (env.REGIONS_FILE || path.join(configDir, 'regions.json')),
+  );
   const regions =
     overrides.regions ??
-    JSON.parse(await readFile(path.join(configDir, 'regions.json'), 'utf8'));
+    JSON.parse(await readFile(regionsFile, 'utf8'));
   const sourceConfig =
     overrides.sources ??
     JSON.parse(await readFile(path.join(configDir, 'sources.json'), 'utf8'));
@@ -115,8 +119,9 @@ export async function loadConfig(overrides = {}) {
       ),
       featureMonths: parseIntEnv(env.HOTSPOTS_EXPORT_MONTHS, 24),
     },
+    regionsFile,
     history: {
-      country: overrides.country ?? env.FIRMS_COUNTRY ?? 'Brazil',
+      country: overrides.country ?? (env.FIRMS_COUNTRY || 'Brazil'),
       startYear: parseIntEnv(env.FIRMS_HISTORY_START_YEAR, 2000),
       indexUrl:
         env.FIRMS_COUNTRY_INDEX_URL ??

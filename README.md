@@ -1,6 +1,8 @@
 # Carcará Orbit
 
-Monorepo do Carcará Orbit: painel e API de monitoramento de focos de calor no Brasil.
+Monorepo do Carcará Orbit: painel e API de monitoramento de focos de calor.
+A instância atual usa dados e regiões do Brasil; o backend aceita outros países,
+recortes e arquivos de regiões (ver [`docs/REQUISITOS.md`](./docs/REQUISITOS.md)).
 
 | Pasta | Stack | Descrição |
 | --- | --- | --- |
@@ -14,7 +16,9 @@ este monorepo passa a ser a fonte única de verdade.
 
 A infraestrutura segue o padrão do [Baseware](https://github.com/platusforge/baseware):
 três arquivos de Compose (base, override de desenvolvimento e override de produção),
-Dockerfiles multi-stage e, em produção, Traefik + nginx servindo a SPA e fazendo proxy de `/api`.
+Postgres 16 em container com backup diário, Dockerfiles multi-stage e, em produção,
+Traefik + nginx servindo a SPA e fazendo proxy de `/api`. O CI/CD faz verificação,
+build das imagens e deploy por SSH na VPS.
 
 ## Como os dois se conectam
 
@@ -33,7 +37,7 @@ Pré-requisitos: Docker Desktop com Compose v2.
 
 ```bash
 cp .env.example .env
-# edite .env se necessário (FIRMS_MAP_KEY, portas, etc.)
+# edite .env (DB_PASSWORD, FIRMS_MAP_KEY, portas, etc.)
 docker compose up --build
 ```
 
@@ -42,9 +46,26 @@ docker compose up --build
 | Web | http://localhost:5173 |
 | API (health) | http://localhost:3000/api/health |
 | API (meta) | http://localhost:3000/api/meta |
+| API (execuções) | http://localhost:3000/api/runs (admin quando `ADMIN_TOKEN` está definido) |
+| Postgres | `localhost:5432` (somente dev) |
 
-O Compose de desenvolvimento usa bind mount e hot reload nos dois serviços.
-Por padrão a API sobe em `DATA_SOURCE=mock`, com os dados de `api/data/mock`.
+O Compose de desenvolvimento usa bind mount e hot reload nos dois serviços. O
+entrypoint da API aplica as migrações do Postgres automaticamente. Por padrão a
+API sobe em `DATA_SOURCE=mock`, com os dados de `api/data/mock`.
+
+### Postgres
+
+- Serviço `db` (`postgres:16-alpine`) com volume `postgres_data`, healthcheck e
+  rede interna.
+- `DATABASE_URL` é montada a partir de `DB_USER`/`DB_PASSWORD`/`DB_NAME`
+  (credenciais percent-encoded).
+- Migrações ficam em [`api/db/migrations`](./api/db/migrations) e são aplicadas
+  pelo entrypoint ou por `docker compose exec api npm run db:migrate`.
+- A tabela `operation_runs` registra execuções de pipeline/NRT/modo e alimenta
+  `GET /api/runs`. A série analítica de focos continua em SQLite/`data/real`
+  nesta fase; a migração para Postgres/PostGIS está no roadmap.
+- Em produção há backup diário no serviço `db-backup` (volume
+  `postgres_backups`). Runbook em [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ### Dados reais (NASA FIRMS)
 
@@ -67,19 +88,38 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env 
 Antes de subir:
 
 - aponte o DNS de `APP_HOST` para o servidor;
-- defina `APP_HOST` e `ADMIN_EMAIL` no `.env` (Traefik/Let's Encrypt);
+- defina `DB_PASSWORD`, `APP_HOST` e `ADMIN_EMAIL` no `.env`;
 - libere as portas `80` e `443`.
 
 O Traefik termina o TLS e encaminha para o nginx do `web`. O nginx serve os assets
 da SPA e faz proxy de `/api` para o serviço `api`, que permanece inacessível
-diretamente pela internet.
+diretamente pela internet. O Postgres não publica porta no host e roda com
+backup diário.
+
+## CI/CD e deploy na VPS
+
+O workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml):
+
+1. valida API e web (lint, build, testes unitários e do pipeline);
+2. sobe um Postgres de serviço, aplica migrações e testa `/api/health`;
+3. valida os Compose e constrói as imagens Docker;
+4. com a variável `DEPLOY_ENABLED=true`, copia o repo para
+   `~/dev/carcara-orbit`, escreve o `.env` a partir dos secrets, sobe o Compose
+   de produção, confere a saúde e remove o `.env`.
+
+Secrets e passos detalhados: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ## Desenvolvimento sem Docker
 
 ```bash
+# Postgres (opcional; sem ele a API sobe com persistência desativada)
+docker compose up -d db
+
 # API
 cd api
 npm ci
+DATABASE_URL=postgresql://carcara:change-me-strong-password@localhost:5432/carcara \
+  npm run db:migrate
 npm run start:dev        # http://localhost:3000/api
 
 # Web (outro terminal)
@@ -96,8 +136,18 @@ npm run dev              # http://localhost:5173
 | `docker compose logs -f api` | Acompanha os logs da API |
 | `docker compose exec api npm run bootstrap` | Baixa/importa o histórico FIRMS |
 | `docker compose exec api npm run pipeline` | Roda o pipeline histórico |
+| `docker compose exec api npm run db:migrate` | Aplica migrações pendentes |
 | `docker compose exec api npm test` | Testes unitários da API |
+| `docker compose exec api npm run pipeline:test` | Testes do pipeline |
 | `docker compose exec web npm run lint` | Lint do front |
+
+## Documentação
+
+- [`docs/REQUISITOS.md`](./docs/REQUISITOS.md) — aderência ao desafio, incluindo
+  a lacuna de escopo global e o roadmap.
+- [`docs/DEPLOY.md`](./docs/DEPLOY.md) — VPS, secrets, migrações, backup/restore.
+- [`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) — dados reais e NRT.
+- [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md) — pipeline FIRMS.
 
 ## Licença
 

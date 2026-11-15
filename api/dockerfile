@@ -5,6 +5,9 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 COPY api/package.json api/package-lock.json ./
 RUN npm ci
+COPY api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
 # ── Desenvolvimento: hot reload ────────────────────────────────────────
 FROM deps AS development
@@ -25,13 +28,18 @@ RUN npm run build
 FROM node:24-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
+COPY api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 COPY api/package.json api/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY api/pipeline ./pipeline
+COPY api/scripts ./scripts
+COPY api/db ./db
 COPY api/data/mock ./data/mock
 RUN mkdir -p /app/data/raw /app/data/real /app/data/db /app/data/runtime \
     && chown -R node:node /app/data
 USER node
 EXPOSE 3000
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/main.js"]

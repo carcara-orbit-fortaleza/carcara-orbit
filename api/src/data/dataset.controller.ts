@@ -9,12 +9,16 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { assertAdmin } from '../common/admin.js';
+import { DatabaseService } from '../database/database.service.js';
 import { CalendarDataset } from './mock-data.service.js';
 import { DataMode, DatasetService } from './dataset.service.js';
 
 @Controller()
 export class DatasetController {
-  constructor(private readonly datasets: DatasetService) {}
+  constructor(
+    private readonly datasets: DatasetService,
+    private readonly database: DatabaseService,
+  ) {}
 
   /** Mode, availability, active period and regions for API clients. */
   @Get('config')
@@ -44,6 +48,7 @@ export class DatasetController {
         real: availability.real.available,
         nrt: true,
         exports: true,
+        database: this.database.enabled,
         adminTokenRequired: Boolean(process.env.ADMIN_TOKEN),
       },
     };
@@ -67,6 +72,7 @@ export class DatasetController {
       throw new BadRequestException('Body must be {"mode":"mock"} or {"mode":"real"}');
     }
     const mode = this.datasets.setMode(body.mode as DataMode);
+    void this.database.track('mode', { mode }, async () => ({ mode }));
     return {
       mode,
       availability: this.datasets.availability(),

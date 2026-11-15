@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { loadEnvFile } from './config/env.js';
+import { DatabaseModule } from './database/database.module.js';
 import { DataModule } from './data/data.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { CalendarModule } from './calendar/calendar.module.js';
@@ -12,6 +13,7 @@ loadEnvFile();
 
 @Module({
   imports: [
+    DatabaseModule,
     DataModule,
     MetaModule,
     CalendarModule,

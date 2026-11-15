@@ -1,6 +1,9 @@
 # ── Dev: hot reload, bind mounts e portas publicadas ───────────────────
 # Carregado automaticamente por `docker compose up`.
 services:
+  db:
+    ports: ["${DB_PORT:-5432}:5432"]
+
   api:
     build:
       target: development

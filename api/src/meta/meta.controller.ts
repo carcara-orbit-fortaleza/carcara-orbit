@@ -1,19 +1,36 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { DatabaseService } from '../database/database.service.js';
 import { DatasetService } from '../data/dataset.service.js';
 
 const startedAt = Date.now();
 
 @Controller()
 export class MetaController {
-  constructor(private readonly data: DatasetService) {}
+  constructor(
+    private readonly data: DatasetService,
+    private readonly database: DatabaseService,
+  ) {}
 
   /** Status do serviço (contrato do brief: /api/health). */
   @Get('health')
-  health() {
+  async health() {
+    const database = await this.database.status();
+    if (database.configured && !database.connected) {
+      throw new ServiceUnavailableException({
+        status: 'degraded',
+        database,
+      });
+    }
+
     return {
       status: 'ok',
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       dataSource: this.data.currentMode,
+      database,
     };
   }
 

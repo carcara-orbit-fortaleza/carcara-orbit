@@ -2,6 +2,24 @@
 # Uso:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build
 services:
+  db:
+    restart: always
+    shm_size: 256mb
+    command:
+      - postgres
+      - -c shared_buffers=256MB
+      - -c effective_cache_size=768MB
+      - -c work_mem=16MB
+      - -c wal_compression=on
+      - -c max_connections=100
+      - -c log_min_duration_statement=3000
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${DB_USER:-carcara} -d ${DB_NAME:-carcara}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   traefik:
     image: traefik:v2.11
     restart: always
@@ -65,5 +83,23 @@ services:
       - "traefik.http.routers.web.middlewares=web-secure"
       - "traefik.http.services.web.loadbalancer.server.port=80"
 
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${DB_USER:-carcara}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      - POSTGRES_DB=${DB_NAME:-carcara}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+    volumes: [postgres_backups:/backups]
+    networks: [app-network]
+    depends_on:
+      db: { condition: service_healthy }
+
 volumes:
   api_data:
+  postgres_backups:

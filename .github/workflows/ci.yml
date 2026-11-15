@@ -1,0 +1,190 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Lint API
+        working-directory: api
+        run: npm run lint
+
+      - name: Lint web
+        working-directory: web
+        run: npm run lint
+
+      - name: Build API
+        working-directory: api
+        run: npm run build
+
+      - name: Build web
+        working-directory: web
+        env:
+          VITE_API_URL: /api
+        run: npm run build
+
+      - name: Unit tests (API)
+        working-directory: api
+        run: npm test
+
+      - name: Pipeline tests
+        working-directory: api
+        run: npm run pipeline:test
+
+      - name: Apply Postgres migrations
+        working-directory: api
+        run: npm run db:migrate
+
+      - name: E2E tests (API)
+        working-directory: api
+        run: npm run test:e2e
+
+      - name: API smoke test with Postgres
+        working-directory: api
+        run: |
+          trap 'kill "$API_PID" 2>/dev/null || true' EXIT
+          node dist/main.js > /tmp/api.log 2>&1 &
+          API_PID=$!
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/health.json
+          grep -q '"connected":true' /tmp/health.json
+          curl -fsS "http://localhost:3000/api/runs?limit=5"
+          if ! grep -q '"status":"ok"' /tmp/health.json; then
+            cat /tmp/api.log
+            exit 1
+          fi
+
+      - name: Validate Compose files
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+          rm -f .env
+
+      - name: Build API image
+        run: docker build -f api/dockerfile -t carcara-api:ci .
+
+      - name: Build web image
+        run: docker build -f web/dockerfile --build-arg VITE_API_URL=/api -t carcara-web:ci .
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - name: Get latest code
+        uses: actions/checkout@v4
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "."
+          target: "~/dev/carcara-orbit"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -euo pipefail
+            cd ~/dev/carcara-orbit
+            trap 'rm -f .env' EXIT
+
+            # Write .env from GitHub secrets (single-quoted to prevent expansion).
+            {
+              printf 'NODE_ENV=%s\n'              'production'
+              printf 'DB_USER=%s\n'               '${{ secrets.DB_USER }}'
+              printf 'DB_PASSWORD=%s\n'           '${{ secrets.DB_PASSWORD }}'
+              printf 'DB_NAME=%s\n'               '${{ secrets.DB_NAME }}'
+              printf 'DB_PORT=%s\n'               '5432'
+              printf 'DB_POOL_MAX=%s\n'           '${{ secrets.DB_POOL_MAX }}'
+              printf 'API_PORT=%s\n'              '${{ secrets.API_PORT }}'
+              printf 'APP_HOST=%s\n'              '${{ secrets.APP_HOST }}'
+              printf 'ADMIN_EMAIL=%s\n'           '${{ secrets.ADMIN_EMAIL }}'
+              printf 'CORS_ORIGIN=%s\n'           'https://${{ secrets.APP_HOST }}'
+              printf 'FIRMS_MAP_KEY=%s\n'         '${{ secrets.FIRMS_MAP_KEY }}'
+              printf 'DATA_SOURCE=%s\n'           '${{ secrets.DATA_SOURCE }}'
+              printf 'ADMIN_TOKEN=%s\n'           '${{ secrets.ADMIN_TOKEN }}'
+              printf 'NRT_ENABLED=%s\n'           '${{ secrets.NRT_ENABLED }}'
+              printf 'NRT_INTERVAL_MINUTES=%s\n'  '${{ secrets.NRT_INTERVAL_MINUTES }}'
+              printf 'NRT_DAYS=%s\n'              '${{ secrets.NRT_DAYS }}'
+              printf 'NRT_REGIONS=%s\n'           '${{ secrets.NRT_REGIONS }}'
+              printf 'FIRMS_SOURCES=%s\n'         '${{ secrets.FIRMS_SOURCES }}'
+              printf 'FIRMS_COUNTRY=%s\n'         '${{ secrets.FIRMS_COUNTRY }}'
+              printf 'REGIONS_FILE=%s\n'          '${{ secrets.REGIONS_FILE }}'
+              printf 'MAX_MAP_POINTS=%s\n'        '${{ secrets.MAX_MAP_POINTS }}'
+              printf 'MAX_EXPORT_ROWS=%s\n'       '${{ secrets.MAX_EXPORT_ROWS }}'
+            } > .env
+
+            # Build, start and apply migrations (idempotent).
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              --env-file .env up -d --build --force-recreate --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              --env-file .env exec -T api node scripts/migrate.mjs
+
+            # Fail the deploy if the API cannot reach Postgres.
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              --env-file .env exec -T api node -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(async r=>{const body=await r.json();if(!r.ok||body.status!=='ok'){console.error(body);process.exit(1)}console.log(JSON.stringify(body))}).catch(e=>{console.error(e);process.exit(1)})"
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env ps

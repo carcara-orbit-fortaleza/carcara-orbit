@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import { join, resolve, sep } from 'node:path';
+import { DatabaseService } from '../database/database.service.js';
 import { DatasetService } from '../data/dataset.service.js';
 
 export interface PipelineCommandResult {
@@ -20,7 +21,10 @@ export class IngestionService {
   private readonly pipelineCli = join(this.root, 'pipeline', 'src', 'cli.js');
   private readonly timeoutMs = Number(process.env.PIPELINE_TIMEOUT_MS ?? 900_000);
 
-  constructor(private readonly datasets: DatasetService) {}
+  constructor(
+    private readonly datasets: DatasetService,
+    private readonly database: DatabaseService,
+  ) {}
 
   /** Runs the historical FIRMS CSV pipeline into data/real. */
   async runHistorical(inputDir?: string): Promise<PipelineCommandResult> {
@@ -28,7 +32,9 @@ export class IngestionService {
     if (!resolved.startsWith(`${resolve(this.dataDir)}${sep}`)) {
       throw new BadRequestException('inputDir must be inside the project data/ directory');
     }
-    return this.run(['pipeline', '--input', resolved, '--out', this.realDir, '--json']);
+    return this.database.track('pipeline', { inputDir: resolved }, () =>
+      this.run(['pipeline', '--input', resolved, '--out', this.realDir, '--json']),
+    );
   }
 
   /** Fetches recent FIRMS data, merges with stored history and rebuilds data/real. */
@@ -36,7 +42,7 @@ export class IngestionService {
     const args = ['nrt', '--json'];
     if (options.regions) args.push('--regions', options.regions);
     if (options.days !== undefined) args.push('--days', String(options.days));
-    return this.run(args);
+    return this.database.track('nrt', options, () => this.run(args));
   }
 
   private run(args: string[]): Promise<PipelineCommandResult> {

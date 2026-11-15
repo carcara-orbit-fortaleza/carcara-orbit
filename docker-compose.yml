@@ -4,6 +4,22 @@
 name: carcara-orbit
 
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-carcara}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      POSTGRES_DB: ${DB_NAME:-carcara}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${DB_USER:-carcara} -d ${DB_NAME:-carcara}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [app-network]
+
   api:
     build:
       context: .
@@ -11,8 +27,15 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - PORT=${API_PORT:-3000}
+      - DB_USER=${DB_USER:-carcara}
+      - DB_PASSWORD=${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      - DB_NAME=${DB_NAME:-carcara}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_POOL_MAX=${DB_POOL_MAX:-10}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
       - DATA_SOURCE=${DATA_SOURCE:-mock}
+      - REGIONS_FILE=${REGIONS_FILE:-}
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
       - FIRMS_MAP_KEY=${FIRMS_MAP_KEY:-}
       - NRT_ENABLED=${NRT_ENABLED:-false}
@@ -37,6 +60,8 @@ services:
       - CALIBRATION_MAX_FACTOR=${CALIBRATION_MAX_FACTOR:-4.0}
       - MAX_MAP_POINTS=${MAX_MAP_POINTS:-2000}
       - MAX_EXPORT_ROWS=${MAX_EXPORT_ROWS:-50000}
+    depends_on:
+      db: { condition: service_healthy }
     networks: [app-network]
 
   web:
@@ -47,6 +72,9 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
     networks: [app-network]
     depends_on: [api]
+
+volumes:
+  postgres_data:
 
 networks:
   app-network:

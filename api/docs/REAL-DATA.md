@@ -3,6 +3,12 @@
 This NestJS project serves the existing mock API and now also supports real FIRMS
 data through a separate pipeline worker.
 
+> **Postgres (production):** the API connects to Postgres for health checks,
+> schema migrations and the operational run log (`operation_runs`, exposed at
+> `GET /api/runs`). The analytical hotspot history still lives in SQLite and the
+> generated `data/real` JSON files in this phase. Moving that series to
+> Postgres/PostGIS is tracked in `docs/REQUISITOS.md`.
+
 ## Data modes
 
 | Mode | Source | How to enable |
@@ -55,6 +61,7 @@ New real-data endpoints:
 | GET | `/api/nrt/status` | Scheduler state and `keyConfigured` |
 | POST | `/api/nrt/refresh` | Trigger an NRT refresh (202) |
 | GET | `/api/export/hotspots.csv?region=&from=&to=&sensor=&bbox=` | Filtered hotspot CSV |
+| GET | `/api/runs?limit=20` | Operational run history from Postgres (admin when `ADMIN_TOKEN` is set) |
 
 ## Admin protection
 
@@ -118,7 +125,15 @@ FIRMS_DB_PATH=./data/db/firms.sqlite
 FIRMS_COUNTRY=Brazil
 FIRMS_HISTORY_START_YEAR=2000
 HOTSPOTS_EXPORT_MONTHS=24
+# Optional: load region polygons from another GeoJSON file.
+# REGIONS_FILE=./pipeline/config/regions.json
 ```
+
+`FIRMS_COUNTRY` accepts any country listed by the FIRMS yearly country index.
+For other areas, `backfill --bbox=west,south,east,north` accepts any FIRMS Area
+API extent. The API's `/api/hotspots` and hotspot CSV export also accept a free
+`bbox`. Note that calendars and the web UI are still organized around the
+configured regions; see `docs/REQUISITOS.md` for the global-scope gap.
 
 The FIRMS Archive Download form still requires an authenticated Earthdata/email
 session, but the yearly country files used here are public and listed by the

@@ -9,6 +9,7 @@ import { HotspotsModule } from './hotspots/hotspots.module.js';
 import { ExportModule } from './export/export.module.js';
 import { IngestionModule } from './ingestion/ingestion.module.js';
 import { NrtModule } from './nrt/nrt.module.js';
+import { ExplainModule } from './explain/explain.module.js';
 
 loadEnvFile();
 
@@ -23,6 +24,7 @@ loadEnvFile();
     ExportModule,
     IngestionModule,
     NrtModule,
+    ExplainModule,
   ],
 })
 export class AppModule {}

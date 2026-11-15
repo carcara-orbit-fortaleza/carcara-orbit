@@ -53,7 +53,7 @@ export function Home() {
             </h1>
             <p className="mt-5 max-w-prose text-lg text-(--fg-muted)">{t('heroLead')}</p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <a href="/painel" className="rounded-md bg-(--accent) px-5 py-2.5 text-sm font-bold text-(--bg) hover:opacity-90">
+              <a href="/dashboard" className="rounded-md bg-(--accent) px-5 py-2.5 text-sm font-bold text-(--bg) hover:opacity-90">
                 {t('ctaDashboard')} →
               </a>
               <a href="#solution" className="rounded-md border border-(--line) px-4 py-2 text-sm font-semibold hover:border-(--accent)">
@@ -118,17 +118,17 @@ export function Home() {
       </Section>
 
       {/* Painel */}
-      <section id="painel" aria-labelledby="painel-title" className="scroll-mt-20 py-12">
+      <section id="dashboard" aria-labelledby="dashboard-title" className="scroll-mt-20 py-12">
         <div className="feature-card flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
           <div className="max-w-prose">
             <p className="font-mono text-xs tracking-wider text-(--accent-2) uppercase">{t('dashKicker')}</p>
-            <h2 id="painel-title" className="mt-2 font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+            <h2 id="dashboard-title" className="mt-2 font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
               {t('dashTitle')}
             </h2>
             <p className="mt-3 text-(--fg-muted)">{t('dashLead')}</p>
           </div>
           <a
-            href="/painel"
+            href="/dashboard"
             className="shrink-0 rounded-md bg-(--accent) px-5 py-2.5 text-center text-sm font-bold text-(--bg) hover:opacity-90"
           >
             {t('dashButton')} →

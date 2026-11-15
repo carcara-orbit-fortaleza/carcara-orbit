@@ -469,7 +469,7 @@ export class GlobalService {
         calibration_generated_at: calibration?.generated_at ?? null,
         baseline_years: [baselineStart, baselineEnd],
         disclaimer:
-          'Contagens globais derivadas de focos ativos NASA FIRMS/Earthdata. Uso informativo; não substitui validação oficial.',
+          'Global counts derived from NASA FIRMS/Earthdata active fire hotspots. For information only; does not replace official validation.',
       },
     };
   }

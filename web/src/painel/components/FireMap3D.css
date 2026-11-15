@@ -1,0 +1,70 @@
+/* Mapa 3D de chance de fogo (MapLibre). Reaproveita .card, .map-frame, .draw-bar e .segmented do painel. */
+.fire-map-3d .map-frame { height: 520px; background: #07090c; }
+.fire-map-3d .map-hint { z-index: 2; }
+.fire-map-3d .maplibregl-ctrl-group { background: rgba(20, 24, 29, 0.88); border: 1px solid var(--line-soft); box-shadow: none; }
+.fire-map-3d .maplibregl-ctrl-group button + button { border-top-color: var(--line-soft); }
+.fire-map-3d .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1) brightness(0.85); }
+.fire-map-3d .maplibregl-ctrl-attrib { background: rgba(14, 16, 19, 0.75); color: var(--dim); font-size: 10px; }
+.fire-map-3d .maplibregl-ctrl-attrib a { color: var(--muted); }
+.fire-map-3d .maplibregl-ctrl-attrib-button { filter: invert(1); }
+
+.fire-map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; }
+.fire-map-controls .segmented { flex: none; }
+
+.fire-confidence { white-space: nowrap; }
+.fire-confidence.low { color: #ffb16e; border-color: rgba(242, 113, 43, 0.4); background: rgba(242, 113, 43, 0.1); }
+.fire-confidence.medium { color: var(--amber); }
+.fire-confidence.high { color: #8fd1c6; }
+
+.fire-chance-legend { display: grid; grid-template-columns: auto minmax(90px, 160px); grid-template-rows: auto auto; column-gap: 8px; align-items: center; margin-left: auto; color: var(--muted); font-size: 11px; }
+.fire-chance-label { grid-row: 1 / span 2; }
+.fire-chance-bar {
+  height: 8px; border-radius: 4px;
+  /* Mesma rampa do brilho no mapa (GLOW_COLOR em FireMap3D.tsx); rótulos qualitativos, não chance por célula. */
+  background: linear-gradient(90deg, rgba(120, 20, 10, 0.1) 0%, rgba(160, 34, 14, 0.38) 20%, rgba(204, 62, 22, 0.58) 47%, rgba(232, 98, 30, 0.78) 71%, #f07a22 80%, #ffb347 91%, #fff1b8 100%);
+}
+/* VIIRS mais pálido no mapa de fogo (mesmo tom dos pontos, VIIRS em FireMap3D.tsx). */
+.fire-map-3d .sensor-dot.viirs { background: #9fd8d0; }
+.fire-chance-ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+.fire-hypothesis { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+.fire-map-loading {
+  position: absolute; z-index: 2; top: 12px; left: 12px; padding: 6px 10px; border-radius: 999px;
+  background: rgba(14, 16, 19, 0.82); color: var(--amber); font-size: 11.5px; pointer-events: none;
+}
+
+.fire-map-notes { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.fire-map-notes p { margin: 0; }
+.fire-latest { display: inline-flex; align-items: center; gap: 8px; }
+.fire-pulse-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--amber); flex: none; animation: fire-pulse 1.7s ease-out infinite; }
+.fire-selected { color: var(--text); }
+.fire-caveats { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; color: var(--dim); font-size: 11.5px; }
+.fire-caveats li::before { content: "· "; color: var(--amber); }
+
+@keyframes fire-pulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0.2; }
+}
+
+/* Popup de hipótese/foco. */
+.fire-popup .maplibregl-popup-content { background: #1e242b; color: #f2efe8; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); }
+.fire-popup .maplibregl-popup-content i { color: var(--muted); }
+.fire-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.fire-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.fire-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #1e242b; }
+.fire-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.fire-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.fire-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #1e242b; }
+.fire-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #1e242b; }
+.fire-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #1e242b; }
+
+@media (max-width: 640px) {
+  .fire-map-3d .map-frame { height: 380px; }
+  .fire-map-controls .segmented { flex: 1 1 100%; }
+  .fire-chance-legend { margin-left: 0; width: 100%; grid-template-columns: auto minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fire-pulse-dot { animation: none; }
+}

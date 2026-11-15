@@ -57,6 +57,12 @@ desativar o deploy, basta remover a variável.
 | `FIRMS_MAP_KEY` | vazio | NRT/backfill da NASA FIRMS |
 | `DATA_SOURCE` | `mock` | `mock` ou `real` |
 | `ADMIN_TOKEN` | vazio | protege `/api/mode`, `/api/ingestion/run`, `/api/nrt/refresh` |
+| `GEMINI_API_KEY` | vazio | chave do `POST /api/explain`; sem ela o endpoint responde 503 `explain_disabled` |
+| `EXPLAIN_ENABLED` | `false` | precisa ser exatamente `true` (junto com a chave) para habilitar o endpoint |
+| `EXPLAIN_MODEL` | `gemini-3.5-flash-lite` | modelo usado nas explicações |
+| `EXPLAIN_DAILY_TOKEN_BUDGET` | `200000` | teto diário de tokens (em memória, por instância, zera às 00:00 UTC) |
+| `EXPLAIN_DAILY_TOKEN_BUDGET_PER_IP` | 1/10 do global (`20000`) | teto diário de tokens por IP (em memória, mapa limitado com descarte do IP menos recente, zera às 00:00 UTC) |
+| `EXPLAIN_TRUST_PROXY` | `1` no `docker-compose.prod.yml`; desligado fora dele | saltos de proxy confiáveis para o IP do rate limit e do teto por IP (topologia fixa Traefik -> nginx do `web` -> api). Sem isso todos compartilham a chave do IP do nginx e um cliente pode bloquear os demais; com `EXPLAIN_ENABLED=true` e desligado, o boot registra um WARN |
 | `NRT_ENABLED` | `false` | agenda de atualização NRT |
 | `NRT_INTERVAL_MINUTES` | `180` | intervalo do NRT |
 | `NRT_DAYS` | `2` | janela do NRT (máx. 5) |

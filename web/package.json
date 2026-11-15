@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,7 +15,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource/sora": "^5.3.0",
     "@tailwindcss/vite": "^4.3.5",
-    "leaflet": "^1.9.4",
+    "maplibre-gl": "^5.24.1",
     "polygon-clipping": "^0.15.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -24,7 +25,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/leaflet": "^1.9.22",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -36,6 +36,7 @@
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^5.1.0"
   }
 }

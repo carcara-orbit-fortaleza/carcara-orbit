@@ -1,5 +1,6 @@
 import { regionOverlapWeights } from './geo'
 import type { LonLat, RegionSeries } from '../types'
+import { mean } from './stats'
 
 export type RegionWeight = {
   id: string
@@ -17,14 +18,14 @@ export type FilteredCalendar = {
   mode: 'region' | 'polygon' | 'empty'
 }
 
-const BASELINE_FROM = 2003
-const BASELINE_TO = 2025
+export type Baseline = { from: number; to: number }
 
 export function filterCalendar(
   regions: RegionSeries[],
   years: number[],
   polygon: LonLat[] | null,
   regionId: string,
+  baseline: Baseline,
 ): FilteredCalendar {
   const weights: RegionWeight[] = regions.map((region) => ({
     id: region.id,
@@ -52,7 +53,7 @@ export function filterCalendar(
   const counts = blendMatrix(active, byId, years.length, (region) => region.counts)
   const rawModis = blendMatrix(active, byId, years.length, (region) => region.rawModis)
   const rawViirs = blendMatrix(active, byId, years.length, (region) => region.rawViirs)
-  const anomaly = anomalyMatrix(counts, years)
+  const anomaly = anomalyMatrix(counts, years, baseline)
 
   return {
     counts,
@@ -76,27 +77,58 @@ function blendMatrix(
         weight: weight.weight,
         value: pick(byId.get(weight.id) as RegionSeries)[yearIndex]?.[monthIndex] ?? null,
       }))
-      if (parts.every((part) => part.value === null)) return null
-      return parts.reduce((sum, part) => sum + (part.value ?? 0) * part.weight, 0)
+      return blendCell(parts)
     }),
   )
 }
 
-function anomalyMatrix(counts: (number | null)[][], years: number[]): (number | null)[][] {
+/**
+ * Valor de uma célula ano×mês de um polígono: soma dos valores das regiões ativas vezes o peso.
+ * null só quando TODAS as regiões estão sem dado; se só algumas faltam, elas entram como 0
+ * (comportamento existente, preservado).
+ */
+export function blendCell(parts: { weight: number; value: number | null }[]): number | null {
+  if (parts.every((part) => part.value === null)) return null
+  return parts.reduce((sum, part) => sum + (part.value ?? 0) * part.weight, 0)
+}
+
+/** Valores do mês `month` (0..11) nos anos de referência com dado, com os anos de origem. */
+export function referenceValues(
+  counts: (number | null)[][],
+  years: number[],
+  reference: Baseline,
+  month: number,
+): { years: number[]; values: number[] } {
+  const usedYears: number[] = []
+  const values: number[] = []
+  for (let yearIndex = 0; yearIndex < years.length; yearIndex++) {
+    const year = years[yearIndex]
+    const value = counts[yearIndex]?.[month] ?? null
+    if (year >= reference.from && year <= reference.to && value !== null) {
+      usedYears.push(year)
+      values.push(value)
+    }
+  }
+  return { years: usedYears, values }
+}
+
+/** Desvio percentual de `value` em relação à média de referência (não-zero). */
+export function anomalyPct(value: number, referenceMean: number): number {
+  return ((value - referenceMean) / referenceMean) * 100
+}
+
+/**
+ * Anomalia de cada célula contra a média do mesmo mês nos anos de referência.
+ * Sem ano de referência com dado (ou com média zero) a anomalia é null: não existe régua.
+ */
+export function anomalyMatrix(counts: (number | null)[][], years: number[], reference: Baseline): (number | null)[][] {
   const anomaly = counts.map((row) => row.map(() => null as number | null))
   for (let month = 0; month < 12; month++) {
-    const baseline: number[] = []
+    const { values } = referenceValues(counts, years, reference, month)
+    const monthMean = values.length === 0 ? null : mean(values)
     for (let yearIndex = 0; yearIndex < years.length; yearIndex++) {
-      const year = years[yearIndex]
-      const value = counts[yearIndex][month]
-      if (year >= BASELINE_FROM && year <= BASELINE_TO && value !== null) baseline.push(value)
-    }
-    const mean = baseline.length === 0 ? 0 : baseline.reduce((sum, value) => sum + value, 0) / baseline.length
-    for (let yearIndex = 0; yearIndex < years.length; yearIndex++) {
-      const value = counts[yearIndex][month]
-      if (value === null) anomaly[yearIndex][month] = null
-      else if (mean === 0) anomaly[yearIndex][month] = 0
-      else anomaly[yearIndex][month] = ((value - mean) / mean) * 100
+      const value = counts[yearIndex]?.[month] ?? null
+      anomaly[yearIndex][month] = value === null || monthMean === null || monthMean === 0 ? null : anomalyPct(value, monthMean)
     }
   }
   return anomaly

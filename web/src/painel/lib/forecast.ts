@@ -1,19 +1,35 @@
 import type { LonLat, RegionSeries } from '../types'
+import type { Baseline } from './series'
+import { mean, percentile } from './stats'
 
 // Calculadora de cenários. Tudo aqui é estatística simples sobre a série já carregada no painel:
 // projeção por tendência linear, distribuição empírica dos anos de referência e uma aproximação
 // geométrica para postos. Não é previsão operacional: o resultado é uma hipótese com probabilidade.
 
-const BASELINE_FROM = 2003
-const BASELINE_TO = 2025
+// Mínimo de anos completos de referência para a calculadora projetar alguma coisa.
+// Abaixo disso, percentis e chance de "ano alto" seriam ruído e a tela mostra um estado vazio.
+export const MIN_REFERENCE_YEARS = 5
 const EARTH_RADIUS_KM = 6371
 // Fator de rota: a distância em linha reta subestima o deslocamento por estradas.
-const ROAD_FACTOR = 1.3
-// Limiar de alerta: percentil da série anual de referência acima do qual o ano é "alto".
-const ALERT_PERCENTILE = 0.75
+export const ROAD_FACTOR = 1.3
+// Limiar de alerta padrão: percentil da série anual de referência acima do qual o ano é "alto".
+// Pode ser sobrescrito por ForecastOptions.alertPercentile (camada "E se?").
+export const DEFAULT_ALERT_PERCENTILE = 0.75
 // Limites para não extrapolar a tendência para valores absurdos em horizontes longos.
-const MIN_FACTOR = 0.1
-const MAX_FACTOR = 3
+export const MIN_FACTOR = 0.1
+export const MAX_FACTOR = 3
+// Faixa de incerteza exibida por ano: P05–P95 da amostra deslocada pelo fator.
+export const RANGE_LOW_P = 0.05
+export const RANGE_HIGH_P = 0.95
+// Razão do pico mensal a partir da qual um mês é considerado "de pico".
+export const PEAK_MONTH_RATIO = 0.5
+// Janelas pequenas: P05–P95 equivale a mínimo–máximo (ver caveat range-is-minmax).
+export const SMALL_SAMPLE_N = 20
+
+export type ForecastOptions = {
+  /** Percentil (0..1) do limiar de alerta. Padrão DEFAULT_ALERT_PERCENTILE. */
+  alertPercentile?: number
+}
 
 export type CalcInputs = {
   horizonYears: number
@@ -67,6 +83,11 @@ export type PostPlan = {
   missingPosts: number
 }
 
+export type ForecastContext = {
+  currentYear: number
+  baseline: Baseline
+}
+
 export type Forecast = {
   regionId: string
   regionName: string
@@ -75,14 +96,16 @@ export type Forecast = {
   alertThreshold: number
   baselineMean: number
   sampleYears: number
-  trendPctDecade: number
+  trendPctDecade: number | null
+  /** false quando há menos de MIN_REFERENCE_YEARS anos completos: nada aqui deve ser exibido como projeção. */
+  sufficient: boolean
   years: YearProjection[]
   months: MonthRisk[]
   peakMonths: string[]
   posts: PostPlan
   totals: { costBrl: number; avoidedFocuses: number; costPerAvoided: number | null }
   confidence: string
-  uncertaintyPct: number
+  uncertaintyPct: number | null
 }
 
 export type RegionOverview = {
@@ -92,35 +115,39 @@ export type RegionOverview = {
   expectedNext: number
   chanceAboveAlert: number
   areaKm2: number
+  sufficient: boolean
 }
 
-export function forecastRegion(region: RegionSeries, years: number[], inputs: CalcInputs): Forecast {
-  const firstYear = Math.max(...years, 2026) + 1
-  const sample = baselineSample(region)
-  const baselineMean = sample.length ? mean(sample) : region.metrics.baselineMeanAnnual
-  const alertThreshold = percentile(sample, ALERT_PERCENTILE)
+export function forecastRegion(
+  region: RegionSeries,
+  inputs: CalcInputs,
+  context: ForecastContext,
+  options: ForecastOptions = {},
+): Forecast {
+  const firstYear = context.currentYear + 1
+  const sample = baselineSample(region, context.baseline)
+  const sufficient = sample.length >= MIN_REFERENCE_YEARS
+  const baselineMean = sample.length ? mean(sample) : region.metrics.baselineMeanAnnual ?? 0
+  const alertThreshold = percentile(sample, options.alertPercentile ?? DEFAULT_ALERT_PERCENTILE)
   const trend = region.metrics.trendPctDecade
+  const trendFrom = context.baseline.to
   const horizon = clampInt(inputs.horizonYears, 1, 10)
   const areaKm2 = ringAreaKm2(region.ring)
 
-  const monthly = region.climatology.map((month) => month.mean)
+  const monthly = monthlyMeans(region)
   const monthTotal = monthly.reduce((sum, value) => sum + value, 0)
   const maxMonth = Math.max(0, ...monthly)
 
   const projections: YearProjection[] = []
-  let peakMonthlyExpected = 0
   for (let index = 0; index < horizon; index++) {
     const year = firstYear + index
-    const factor = trendFactor(trend, year)
+    const factor = trendFactor(trend ?? 0, year, trendFrom)
     const expected = baselineMean * factor
     const shifted = sample.map((value) => value * factor)
-    const low = percentile(shifted, 0.05)
-    const high = percentile(shifted, 0.95)
-    const chance = sample.length
-      ? sample.filter((value) => value * factor > alertThreshold).length / sample.length
-      : 0
+    const low = percentile(shifted, RANGE_LOW_P)
+    const high = percentile(shifted, RANGE_HIGH_P)
+    const chance = exceedance(sample, factor, alertThreshold).chance
     const avoided = expected * (clampNumber(inputs.targetReductionPct, 0, 100) / 100)
-    peakMonthlyExpected = Math.max(peakMonthlyExpected, maxMonth * factor)
     projections.push({
       year,
       factor,
@@ -134,7 +161,7 @@ export function forecastRegion(region: RegionSeries, years: number[], inputs: Ca
     })
   }
 
-  const posts = planPosts(areaKm2, peakMonthlyExpected, inputs)
+  const posts = planPosts(areaKm2, peakMonthlyExpectedOf(region, projections.map((item) => item.factor)), inputs)
   const annualCost = posts.recommendedPosts * Math.max(0, inputs.postCostPerYear)
 
   for (const projection of projections) {
@@ -146,12 +173,13 @@ export function forecastRegion(region: RegionSeries, years: number[], inputs: Ca
   const totalAvoided = projections.reduce((sum, item) => sum + item.avoidedFocuses, 0)
 
   const months: MonthRisk[] = region.climatology.map((month) => {
-    const share = monthTotal > 0 ? month.mean / monthTotal : 0
+    const value = month.mean ?? 0
+    const share = monthTotal > 0 ? value / monthTotal : 0
     return {
       label: month.label,
-      expected: month.mean * (projections[0]?.factor ?? 1),
+      expected: value * (projections[0]?.factor ?? 1),
       share,
-      peak: maxMonth > 0 && month.mean >= maxMonth * 0.5,
+      peak: maxMonth > 0 && value >= maxMonth * PEAK_MONTH_RATIO,
     }
   })
 
@@ -164,6 +192,7 @@ export function forecastRegion(region: RegionSeries, years: number[], inputs: Ca
     baselineMean,
     sampleYears: sample.length,
     trendPctDecade: trend,
+    sufficient,
     years: projections,
     months,
     peakMonths: months.filter((month) => month.peak).map((month) => month.label),
@@ -178,10 +207,15 @@ export function forecastRegion(region: RegionSeries, years: number[], inputs: Ca
   }
 }
 
-export function overviewRegions(regions: RegionSeries[], years: number[], inputs: CalcInputs): RegionOverview[] {
+export function overviewRegions(
+  regions: RegionSeries[],
+  inputs: CalcInputs,
+  context: ForecastContext,
+  options: ForecastOptions = {},
+): RegionOverview[] {
   return regions
     .map((region) => {
-      const forecast = forecastRegion(region, years, { ...inputs, horizonYears: 1 })
+      const forecast = forecastRegion(region, { ...inputs, horizonYears: 1 }, context, options)
       const next = forecast.years[0]
       return {
         id: region.id,
@@ -190,9 +224,10 @@ export function overviewRegions(regions: RegionSeries[], years: number[], inputs
         expectedNext: next?.expected ?? 0,
         chanceAboveAlert: next?.chanceAboveAlert ?? 0,
         areaKm2: ringAreaKm2(region.ring),
+        sufficient: forecast.sufficient,
       }
     })
-    .sort((a, b) => b.chanceAboveAlert - a.chanceAboveAlert || b.expectedNext - a.expectedNext)
+    .sort((a, b) => Number(b.sufficient) - Number(a.sufficient) || b.chanceAboveAlert - a.chanceAboveAlert || b.expectedNext - a.expectedNext)
 }
 
 /**
@@ -238,29 +273,72 @@ export function ringAreaKm2(ring: LonLat[]): number {
   return Math.abs((sum * EARTH_RADIUS_KM * EARTH_RADIUS_KM) / 2)
 }
 
-function trendFactor(trendPctDecade: number, year: number): number {
-  const decadesAhead = (year - BASELINE_TO) / 10
-  const factor = 1 + (trendPctDecade / 100) * decadesAhead
-  return Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, factor))
+/** Média histórica por mês (null vira 0 SÓ aqui, para somar e achar o pico; a UI de clima continua mostrando null). */
+export function monthlyMeans(region: RegionSeries): number[] {
+  return region.climatology.map((month) => month.mean ?? 0)
 }
 
-function baselineSample(region: RegionSeries): number[] {
-  return region.annual
-    .filter((point) => point.year >= BASELINE_FROM && point.year <= BASELINE_TO && !point.partial)
-    .map((point) => point.total)
+/** Maior média mensal histórica × maior fator projetado: o pico mensal esperado que dimensiona a carga dos postos. */
+export function peakMonthlyExpectedOf(region: RegionSeries, factors: number[]): number {
+  const maxMonth = Math.max(0, ...monthlyMeans(region))
+  return factors.reduce((best, factor) => Math.max(best, maxMonth * factor), 0)
 }
 
-function mean(values: number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / values.length
+export type TrendFactorTrace = {
+  /** Fator aplicado (já limitado). */
+  factor: number
+  /** Fator linear antes do limite: 1 + tendência × décadas à frente. */
+  raw: number
+  decadesAhead: number
+  /** 'min' | 'max' quando o limite atuou; null caso contrário. */
+  clamped: 'min' | 'max' | null
 }
 
-function percentile(values: number[], p: number): number {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const index = (sorted.length - 1) * p
-  const low = Math.floor(index)
-  const high = Math.ceil(index)
-  return sorted[low] + (sorted[high] - sorted[low]) * (index - low)
+/** Fator de tendência com o intermediário e a indicação de limite atingido. */
+export function trendFactorTrace(trendPctDecade: number, year: number, fromYear: number): TrendFactorTrace {
+  const decadesAhead = (year - fromYear) / 10
+  const raw = 1 + (trendPctDecade / 100) * decadesAhead
+  const factor = Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, raw))
+  return { factor, raw, decadesAhead, clamped: raw > MAX_FACTOR ? 'max' : raw < MIN_FACTOR ? 'min' : null }
+}
+
+export function trendFactor(trendPctDecade: number, year: number, fromYear: number): number {
+  return trendFactorTrace(trendPctDecade, year, fromYear).factor
+}
+
+export type BaselineSampleTrace = {
+  /** Anos completos e com dado dentro da janela, em ordem de aparição. */
+  years: number[]
+  values: number[]
+  /** Anos da janela fora da amostra, com o motivo. */
+  excluded: { year: number; reason: 'partial' | 'no-data' }[]
+}
+
+/** Amostra de referência (totais anuais) com os anos de origem. */
+export function baselineSampleTrace(region: RegionSeries, baseline: Baseline): BaselineSampleTrace {
+  const years: number[] = []
+  const values: number[] = []
+  const excluded: BaselineSampleTrace['excluded'] = []
+  for (const point of region.annual) {
+    if (point.year < baseline.from || point.year > baseline.to) continue
+    if (point.partial) excluded.push({ year: point.year, reason: 'partial' })
+    else if (point.total === null) excluded.push({ year: point.year, reason: 'no-data' })
+    else {
+      years.push(point.year)
+      values.push(point.total)
+    }
+  }
+  return { years, values, excluded }
+}
+
+export function baselineSample(region: RegionSeries, baseline: Baseline): number[] {
+  return baselineSampleTrace(region, baseline).values
+}
+
+/** Quantos anos da amostra, deslocados pelo fator, passam do limiar. Taxa empírica, não probabilidade calibrada. */
+export function exceedance(sample: number[], factor: number, threshold: number): { count: number; n: number; chance: number } {
+  const count = sample.filter((value) => value * factor > threshold).length
+  return { count, n: sample.length, chance: sample.length ? count / sample.length : 0 }
 }
 
 function clampInt(value: number, min: number, max: number): number {

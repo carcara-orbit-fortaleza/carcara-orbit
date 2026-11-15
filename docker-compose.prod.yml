@@ -41,6 +41,13 @@ services:
       target: production
     environment:
       - NODE_ENV=production
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - EXPLAIN_ENABLED=${EXPLAIN_ENABLED:-false}
+      - EXPLAIN_MODEL=${EXPLAIN_MODEL:-gemini-3.5-flash-lite}
+      - EXPLAIN_DAILY_TOKEN_BUDGET=${EXPLAIN_DAILY_TOKEN_BUDGET:-200000}
+      # Topologia fixa Traefik -> nginx (web) -> api: 1 salto confiável para o IP real.
+      - EXPLAIN_TRUST_PROXY=${EXPLAIN_TRUST_PROXY:-1}
+      - EXPLAIN_DAILY_TOKEN_BUDGET_PER_IP=${EXPLAIN_DAILY_TOKEN_BUDGET_PER_IP:-}
     volumes:
       - api_data:/app/data
     healthcheck:

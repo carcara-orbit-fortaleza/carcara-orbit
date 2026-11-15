@@ -29,12 +29,16 @@
     "pipeline:test": "node --test --test-concurrency=1 pipeline/test/backfill.test.js pipeline/test/bootstrap.test.js pipeline/test/csv.test.js pipeline/test/firms.test.js pipeline/test/global.test.js pipeline/test/grid.test.js pipeline/test/nrt.test.js pipeline/test/pipeline.test.js"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.121",
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/throttler": "^6.7.1",
+    "ai": "^7.0.173",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

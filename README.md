@@ -8,7 +8,7 @@ ingestão e consulta global (ver [`docs/GLOBAL.md`](./docs/GLOBAL.md) e
 | Pasta | Stack | Descrição |
 | --- | --- | --- |
 | [`api/`](./api) | NestJS 12 · TypeScript · Node 24 | API de focos, calendário, regiões, exportação e pipeline FIRMS |
-| [`web/`](./web) | React 19 · Vite 7 · Tailwind 4 | Site público e painel (`/painel`) |
+| [`web/`](./web) | React 19 · Vite 7 · Tailwind 4 | Site público e painel (`/dashboard`) |
 
 Os códigos originais viviam nos repositórios
 [carcara-api](https://github.com/carcara-orbit-fortaleza/carcara-api) e

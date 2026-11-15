@@ -53,7 +53,7 @@ export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
               {t(s.key)}
             </a>
           ))}
-          <a href="/painel" className="font-semibold text-(--accent-2) hover:text-(--fg)">
+          <a href="/dashboard" className="font-semibold text-(--accent-2) hover:text-(--fg)">
             {t('navDashboard')} →
           </a>
         </nav>
@@ -104,7 +104,7 @@ export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
                 {t(s.key)}
               </a>
             ))}
-            <a href="/painel" className="flex min-h-11 items-center rounded px-1 font-semibold text-(--accent-2) hover:text-(--fg)">
+            <a href="/dashboard" className="flex min-h-11 items-center rounded px-1 font-semibold text-(--accent-2) hover:text-(--fg)">
               {t('navDashboard')} →
             </a>
           </nav>

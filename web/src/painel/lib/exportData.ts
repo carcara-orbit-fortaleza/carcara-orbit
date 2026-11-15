@@ -1,5 +1,6 @@
 import type { FilteredCalendar } from './series'
-import type { Hotspot, LonLat } from '../types'
+import type { FireGrid } from './fireGrid'
+import type { Hotspot, LonLat, RegionSeries } from '../types'
 
 const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 
@@ -17,7 +18,10 @@ export function download(filename: string, content: string, type = 'text/csv;cha
   }, 400)
 }
 
-export function calendarCsv(calendar: FilteredCalendar, years: number[], place: string, biome: string): string {
+/** Versões gravadas em cada linha exportada, lidas de /api/meta. */
+export type ExportVersions = { method: string; dataset: string }
+
+export function calendarCsv(calendar: FilteredCalendar, years: number[], place: string, biome: string, versions: ExportVersions): string {
   const header = ['regiao', 'bioma', 'ano', 'mes', 'focos_harmonizados', 'anomalia_pct', 'modis_bruto', 'viirs_bruto', 'metodo', 'versao']
   const rows = [header]
   years.forEach((year, yearIndex) => {
@@ -33,15 +37,15 @@ export function calendarCsv(calendar: FilteredCalendar, years: number[], place: 
         num(calendar.anomaly[yearIndex]?.[month] ?? null, 1),
         num(calendar.rawModis[yearIndex]?.[month] ?? null, 0),
         num(calendar.rawViirs[yearIndex]?.[month] ?? null, 0),
-        'h1.0',
-        'global-1.0',
+        versions.method,
+        versions.dataset,
       ])
     }
   })
   return `\uFEFF${rows.map((row) => row.join(';')).join('\r\n')}`
 }
 
-export function hotspotCsv(hotspots: Hotspot[]): string {
+export function hotspotCsv(hotspots: Hotspot[], versions: ExportVersions): string {
   const header = ['id', 'data', 'lat', 'lon', 'sensor', 'plataforma', 'frp_mw', 'confianca', 'regiao', 'versao']
   const rows = [header, ...hotspots.map((hotspot) => [
     hotspot.id,
@@ -51,20 +55,46 @@ export function hotspotCsv(hotspots: Hotspot[]): string {
     hotspot.sensor,
     hotspot.platform,
     num(hotspot.frp, 1),
-    String(hotspot.confidence),
+    hotspot.confidence === null ? '' : String(hotspot.confidence),
     hotspot.regionId,
-    'h1.0',
+    versions.method,
   ])]
   return `\uFEFF${rows.map((row) => row.join(';')).join('\r\n')}`
 }
 
-export function areaGeoJson(ring: LonLat[], name: string): string {
+/**
+ * Grade de chance por célula. Cada linha é uma hipótese (padrão recente se repete), não previsão:
+ * a confiança e as ressalvas da grade vão em todas as linhas para não se perderem fora do painel.
+ */
+export function gridCsv(grid: FireGrid, regions: RegionSeries[], versions: ExportVersions): string {
+  const names = new Map(regions.map((region) => [region.id, region.name]))
+  const header = ['id', 'lon_centro', 'lat_centro', 'regiao', 'observados', 'esperados', 'p', 'p05', 'p95', 'horizonte_dias', 'confianca', 'ressalvas', 'versao']
+  const caveats = grid.caveats.join('|')
+  const rows = [header, ...grid.cells.map((cell) => [
+    cell.id,
+    num(cell.center[0], 3),
+    num(cell.center[1], 3),
+    names.get(cell.regionId) ?? cell.regionId,
+    String(cell.observed),
+    num(cell.expected, 4),
+    num(cell.p, 4),
+    num(cell.pLow, 4),
+    num(cell.pHigh, 4),
+    String(grid.horizonDays),
+    grid.confidence,
+    caveats,
+    versions.method,
+  ])]
+  return `\uFEFF${rows.map((row) => row.join(';')).join('\r\n')}`
+}
+
+export function areaGeoJson(ring: LonLat[], name: string, versions: ExportVersions): string {
   const closed = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
     ? ring
     : [...ring, ring[0]]
   return JSON.stringify({
     type: 'Feature',
-    properties: { name, method_version: 'h1.0' },
+    properties: { name, method_version: versions.method, dataset_version: versions.dataset },
     geometry: { type: 'Polygon', coordinates: [closed] },
   }, null, 2)
 }

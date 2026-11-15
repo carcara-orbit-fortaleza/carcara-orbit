@@ -337,10 +337,11 @@ export class GlobalService {
       const dataYearsMax = Number(meta.years_max ?? 2025);
       // O agregado cobre só anos consolidados; o FIRMS informa o ano corrente
       // (NRT), que entra no calendário como coluna ainda sem dados.
+      const nowYear = new Date().getUTCFullYear();
       const currentYear = Math.min(
-        new Date().getUTCFullYear(),
+        nowYear,
         LAST_YEAR,
-        Math.max(dataYearsMax, firmsYear ?? dataYearsMax),
+        Math.max(dataYearsMax, firmsYear ?? nowYear),
       );
       const lastYear = Math.max(dataYearsMax, currentYear);
       const years = Array.from(

@@ -149,6 +149,7 @@ curl -fsS "https://$APP_HOST/api/health"
 | --- | --- |
 | `network ... declared as external, but could not be found` | `TRAEFIK_NETWORK` errado; ajuste a variável ou crie a rede |
 | 404 do Traefik | `web` fora da rede, `traefik.enable=true` ausente ou provider Docker do Traefik desabilitado |
+| 404 e `docker inspect <web> --format '{{.State.Health.Status}}'` mostra `unhealthy` | Traefik ignora containers unhealthy; corrija o healthcheck (use `127.0.0.1`, não `localhost`) |
 | 404 e `web` não aparece no dashboard do Traefik | `providers.docker.constraints` do Traefik exclui o container |
 | `certificate resolver ... does not exist` / TLS inválido | `TRAEFIK_CERT_RESOLVER` não corresponde ao ACME do Traefik |
 | 502 Bad Gateway | `web` unhealthy ou `traefik.http.services...server.port` diferente de `80` |
@@ -166,8 +167,8 @@ curl -fsS "https://$APP_HOST/api/health"
    - copia o repositório para `~/dev/carcara-orbit`;
    - escreve `.env` a partir dos secrets e das variáveis `TRAEFIK_*`;
    - executa `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --force-recreate --remove-orphans` (sem publicar `80/443`);
-   - reaplica as migrações (idempotente);
-   - falha se `/api/health` não estiver `ok` com Postgres conectado;
+   - o entrypoint da API aplica as migrações pendentes no boot;
+   - espera `/api/health` ficar `ok` com Postgres conectado (com retry);
    - remove o `.env` ao final (mesmo em caso de erro).
 
 ## Deploy manual

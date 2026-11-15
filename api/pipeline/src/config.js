@@ -155,6 +155,41 @@ export async function loadConfig(overrides = {}) {
       maxMapPoints: parseIntEnv(env.MAX_MAP_POINTS, 2000),
       maxExportRows: parseIntEnv(env.MAX_EXPORT_ROWS, 50000),
     },
+    global: {
+      databaseFile: path.resolve(
+        env.GLOBAL_DB_PATH ?? path.join(storageDir, 'db', 'global.sqlite'),
+      ),
+      rawDir: path.resolve(
+        env.GLOBAL_RAW_DIR ?? path.join(storageDir, 'raw', 'global'),
+      ),
+      statusFile: path.resolve(
+        env.GLOBAL_STATUS_FILE ??
+          path.join(storageDir, 'runtime', 'global-ingestion.json'),
+      ),
+      regionsFile: path.resolve(
+        env.GLOBAL_REGIONS_FILE ??
+          path.join(storageDir, 'runtime', 'global-regions.json'),
+      ),
+      calibrationFile: path.resolve(
+        env.GLOBAL_CALIBRATION_FILE ??
+          path.join(storageDir, 'runtime', 'global-calibration.json'),
+      ),
+      downloadCheckpoint: path.resolve(
+        env.GLOBAL_DOWNLOAD_CHECKPOINT ??
+          path.join(storageDir, 'runtime', 'global-download.json'),
+      ),
+      importCheckpoint: path.resolve(
+        env.GLOBAL_IMPORT_CHECKPOINT ??
+          path.join(storageDir, 'runtime', 'global-import.json'),
+      ),
+      gridDegrees: parseNumberEnv(env.GLOBAL_GRID_DEGREES, 10),
+      nrtTileDegrees: parseNumberEnv(env.GLOBAL_NRT_TILE_DEGREES, 30),
+      startYear: parseIntEnv(env.GLOBAL_START_YEAR, 2000),
+      endYear: parseIntEnv(env.GLOBAL_END_YEAR, new Date().getUTCFullYear() - 1),
+      maxFiles: env.GLOBAL_MAX_FILES
+        ? parseIntEnv(env.GLOBAL_MAX_FILES, undefined)
+        : undefined,
+    },
     firms: {
       mapKey: overrides.firmsMapKey ?? env.FIRMS_MAP_KEY ?? '',
       baseUrl: (overrides.firmsBaseUrl ?? env.FIRMS_BASE_URL ?? 'https://firms.modaps.eosdis.nasa.gov').replace(/\/+$/, ''),

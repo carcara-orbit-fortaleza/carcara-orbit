@@ -14,6 +14,13 @@ describe('API (e2e)', () => {
     process.env.DATA_SOURCE = 'mock';
     process.env.DATASET_MODE_FILE = join(tmpdir(), `carcara-app-mode-${Date.now()}.json`);
     process.env.REAL_DATA_DIR = join(tmpdir(), `carcara-app-real-${Date.now()}`);
+    process.env.GLOBAL_DB_PATH = join(tmpdir(), `carcara-global-${Date.now()}.sqlite`);
+    process.env.GLOBAL_REGIONS_FILE = join(tmpdir(), `carcara-regions-${Date.now()}.json`);
+    process.env.GLOBAL_CALIBRATION_FILE = join(
+      tmpdir(),
+      `carcara-calibration-${Date.now()}.json`,
+    );
+    process.env.GLOBAL_STATUS_FILE = join(tmpdir(), `carcara-status-${Date.now()}.json`);
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -75,6 +82,21 @@ describe('API (e2e)', () => {
     return request(app.getHttpServer())
       .get('/api/hotspots?bbox=1,2,3')
       .expect(400);
+  });
+
+  it('GET /api/global/status reports an empty global dataset', () => {
+    return request(app.getHttpServer())
+      .get('/api/global/status')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.scope).toBe('global');
+        expect(res.body.database.available).toBe(false);
+        expect(res.body.ingestion.running).toBe(false);
+      });
+  });
+
+  it('GET /api/global/regions returns 503 while the global dataset is missing', () => {
+    return request(app.getHttpServer()).get('/api/global/regions').expect(503);
   });
 
   it('GET /api/export.csv returns a BOM, semicolons and 322 rows for the full series', () => {

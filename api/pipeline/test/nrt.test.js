@@ -60,6 +60,6 @@ test('refreshRealData fetches FIRMS-like CSVs and builds data/real in a temp dir
     const raw = await readFile(config.nrt.rawPath, 'utf8');
     assert.ok(raw.trim().split(/\r?\n/).length > 0);
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

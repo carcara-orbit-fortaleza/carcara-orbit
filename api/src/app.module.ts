@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { loadEnvFile } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DataModule } from './data/data.module.js';
+import { GlobalModule } from './global/global.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { CalendarModule } from './calendar/calendar.module.js';
 import { HotspotsModule } from './hotspots/hotspots.module.js';
@@ -15,6 +16,7 @@ loadEnvFile();
   imports: [
     DatabaseModule,
     DataModule,
+    GlobalModule,
     MetaModule,
     CalendarModule,
     HotspotsModule,

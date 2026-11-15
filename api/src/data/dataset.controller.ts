@@ -49,6 +49,8 @@ export class DatasetController {
         nrt: true,
         exports: true,
         database: this.database.enabled,
+        global: true,
+        globalIngestion: true,
         adminTokenRequired: Boolean(process.env.ADMIN_TOKEN),
       },
     };

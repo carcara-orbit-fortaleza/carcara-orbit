@@ -62,19 +62,37 @@ export function parseCountryIndex(text) {
 
 export function buildCountryPlan({
   indexText,
-  country = 'Brazil',
+  country,
+  countries,
   startYear,
   endYear,
   sources,
 } = {}) {
-  const wantedCountry = normalizeCountry(country);
+  const requested =
+    countries === 'all'
+      ? null
+      : countries !== undefined
+        ? (Array.isArray(countries) ? countries : [countries])
+        : [country ?? 'Brazil'];
+  const wantedCountries =
+    requested === null ? null : new Set(requested.map(normalizeCountry));
   const wantedSources = sources?.length ? new Set(sources) : null;
+
   return parseCountryIndex(indexText)
-    .filter((entry) => normalizeCountry(entry.country) === wantedCountry)
+    .filter(
+      (entry) =>
+        wantedCountries === null ||
+        wantedCountries.has(normalizeCountry(entry.country)),
+    )
     .filter((entry) => (startYear === undefined ? true : entry.year >= Number(startYear)))
     .filter((entry) => (endYear === undefined ? true : entry.year <= Number(endYear)))
     .filter((entry) => !wantedSources || wantedSources.has(entry.sourceCode))
-    .sort((a, b) => a.year - b.year || a.sourceCode.localeCompare(b.sourceCode));
+    .sort(
+      (a, b) =>
+        a.country.localeCompare(b.country) ||
+        a.year - b.year ||
+        a.sourceCode.localeCompare(b.sourceCode),
+    );
 }
 
 async function loadCheckpoint(filePath) {
@@ -135,7 +153,8 @@ async function downloadOne({
  * FIRMS Archive Download page and does not require an authenticated session.
  */
 export async function downloadCountryCsvs({
-  country = 'Brazil',
+  country,
+  countries,
   startYear,
   endYear,
   sources,
@@ -143,12 +162,14 @@ export async function downloadCountryCsvs({
   checkpointFile,
   indexUrl = FIRMS_COUNTRY_INDEX_URL,
   baseUrl = FIRMS_COUNTRY_BASE_URL,
+  includeCountryInPath = false,
   fetchImpl = fetch,
   requestDelayMs = 500,
   timeoutMs = 600_000,
   maxFiles,
   dryRun = false,
   reset = false,
+  onProgress = null,
   logger = console,
 } = {}) {
   const indexResponse = await fetchImpl(indexUrl, {
@@ -166,11 +187,24 @@ export async function downloadCountryCsvs({
     throw new Error('FIRMS country index returned HTML instead of the CSV file list.');
   }
 
-  const plan = buildCountryPlan({ indexText, country, startYear, endYear, sources });
+  const plan = buildCountryPlan({
+    indexText,
+    country,
+    countries,
+    startYear,
+    endYear,
+    sources,
+  });
   const resolvedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const scope =
+    countries === 'all'
+      ? 'the global index'
+      : countries !== undefined
+        ? (Array.isArray(countries) ? countries : [countries]).join(', ')
+        : (country ?? 'Brazil');
   if (plan.length === 0) {
     throw new Error(
-      `No FIRMS country CSVs found for ${country} between ${startYear ?? 'first'} and ${endYear ?? 'last'} (${sources?.join(', ') ?? 'all sources'}).`,
+      `No FIRMS country CSVs found for ${scope} between ${startYear ?? 'first'} and ${endYear ?? 'last'} (${sources?.join(', ') ?? 'all sources'}).`,
     );
   }
 
@@ -183,9 +217,27 @@ export async function downloadCountryCsvs({
   let bytes = 0;
   const errors = [];
 
+  const reportProgress = async (current) => {
+    await onProgress?.({
+      planned: plan.length,
+      attempted,
+      downloaded,
+      skipped,
+      bytes,
+      errors: errors.length,
+      current,
+    });
+  };
+
   for (const entry of plan) {
     if (attempted >= limit) break;
-    const destination = path.join(outputDir, entry.sourceCode, entry.filename);
+    const countryDir = includeCountryInPath ? normalizeCountry(entry.country) : '';
+    const destination = path.join(
+      outputDir,
+      countryDir,
+      entry.sourceCode,
+      entry.filename,
+    );
     const relative = path.relative(outputDir, destination).split(path.sep).join('/');
     const previous = checkpoint.files[relative];
 
@@ -201,6 +253,7 @@ export async function downloadCountryCsvs({
           status: 'done',
         };
         skipped += 1;
+        await reportProgress(relative);
         continue;
       }
       await rm(destination, { force: true });
@@ -208,7 +261,8 @@ export async function downloadCountryCsvs({
 
     attempted += 1;
     if (dryRun) {
-      logger.info?.(`[dry-run] ${entry.sourceCode} ${entry.year}: ${entry.filename}`);
+      logger.info?.(`[dry-run] ${entry.country} ${entry.sourceCode} ${entry.year}: ${entry.filename}`);
+      await reportProgress(relative);
       continue;
     }
 
@@ -226,15 +280,16 @@ export async function downloadCountryCsvs({
         expectedSize: entry.size,
         year: entry.year,
         source: entry.sourceCode,
+        country: entry.country,
         status: 'done',
         at: new Date().toISOString(),
       };
       await saveCheckpoint(checkpointFile, checkpoint);
       logger.info?.(
-        `Downloaded ${downloaded}/${plan.length} · ${entry.sourceCode} ${entry.year} · ${info.size} bytes`,
+        `Downloaded ${downloaded}/${plan.length} · ${entry.country} ${entry.sourceCode} ${entry.year} · ${info.size} bytes`,
       );
     } catch (error) {
-      errors.push({ file: entry.filename, error: error.message });
+      errors.push({ file: entry.filename, country: entry.country, error: error.message });
       checkpoint.files[relative] = {
         ...previous,
         status: 'error',
@@ -244,6 +299,7 @@ export async function downloadCountryCsvs({
       await saveCheckpoint(checkpointFile, checkpoint);
       logger.warn?.(`Failed ${entry.filename}: ${error.message}`);
     }
+    await reportProgress(relative);
 
     if (requestDelayMs > 0 && attempted < plan.length) {
       await sleep(requestDelayMs);
@@ -251,7 +307,8 @@ export async function downloadCountryCsvs({
   }
 
   return {
-    country,
+    country: country ?? null,
+    countries: countries === 'all' ? 'all' : (countries ?? null),
     planned: plan.length,
     attempted,
     downloaded,
@@ -262,6 +319,7 @@ export async function downloadCountryCsvs({
     outputDir,
     checkpointFile,
     firstFiles: plan.slice(0, 20).map((entry) => ({
+      country: entry.country,
       source: entry.sourceCode,
       year: entry.year,
       file: entry.filename,

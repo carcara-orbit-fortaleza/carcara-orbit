@@ -25,7 +25,8 @@
     "nrt": "node pipeline/src/cli.js nrt --json",
     "backfill": "node pipeline/src/cli.js backfill",
     "bootstrap": "node pipeline/src/cli.js bootstrap",
-    "pipeline:test": "node --test pipeline/test/backfill.test.js pipeline/test/bootstrap.test.js pipeline/test/csv.test.js pipeline/test/firms.test.js pipeline/test/nrt.test.js pipeline/test/pipeline.test.js"
+    "global": "node pipeline/src/cli.js global",
+    "pipeline:test": "node --test --test-concurrency=1 pipeline/test/backfill.test.js pipeline/test/bootstrap.test.js pipeline/test/csv.test.js pipeline/test/firms.test.js pipeline/test/global.test.js pipeline/test/grid.test.js pipeline/test/nrt.test.js pipeline/test/pipeline.test.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

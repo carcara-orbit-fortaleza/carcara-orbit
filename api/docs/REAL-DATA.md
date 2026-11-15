@@ -9,6 +9,11 @@ data through a separate pipeline worker.
 > generated `data/real` JSON files in this phase. Moving that series to
 > Postgres/PostGIS is tracked in `docs/REQUISITOS.md`.
 
+> **Global ingestion:** a separate worldwide pipeline downloads every FIRMS
+> country CSV into `data/db/global.sqlite` and exposes `/api/global/*`. See
+> [`docs/GLOBAL.md`](../../docs/GLOBAL.md). It does not alter the Brazil dataset
+> used by the web.
+
 ## Data modes
 
 | Mode | Source | How to enable |
@@ -62,6 +67,10 @@ New real-data endpoints:
 | POST | `/api/nrt/refresh` | Trigger an NRT refresh (202) |
 | GET | `/api/export/hotspots.csv?region=&from=&to=&sensor=&bbox=` | Filtered hotspot CSV |
 | GET | `/api/runs?limit=20` | Operational run history from Postgres (admin when `ADMIN_TOKEN` is set) |
+| GET | `/api/global/status` | Worldwide ingestion coverage and job state |
+| GET | `/api/global/calendar?region=&bbox=&from=&to=` | Global grid/AOI calendar |
+| GET | `/api/global/hotspots?region=&bbox=&from=&to=&sensor=` | Global hotspot search |
+| POST | `/api/global/ingest` | Start worldwide ingestion (admin) |
 
 ## Admin protection
 

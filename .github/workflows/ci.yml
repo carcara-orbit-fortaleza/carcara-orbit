@@ -173,6 +173,11 @@ jobs:
               printf 'FIRMS_SOURCES=%s\n'         '${{ secrets.FIRMS_SOURCES }}'
               printf 'FIRMS_COUNTRY=%s\n'         '${{ secrets.FIRMS_COUNTRY }}'
               printf 'REGIONS_FILE=%s\n'          '${{ secrets.REGIONS_FILE }}'
+              printf 'GLOBAL_GRID_DEGREES=%s\n'   '${{ secrets.GLOBAL_GRID_DEGREES }}'
+              printf 'GLOBAL_NRT_TILE_DEGREES=%s\n' '${{ secrets.GLOBAL_NRT_TILE_DEGREES }}'
+              printf 'GLOBAL_START_YEAR=%s\n'     '${{ secrets.GLOBAL_START_YEAR }}'
+              printf 'GLOBAL_END_YEAR=%s\n'       '${{ secrets.GLOBAL_END_YEAR }}'
+              printf 'GLOBAL_MAX_FILES=%s\n'      '${{ secrets.GLOBAL_MAX_FILES }}'
               printf 'MAX_MAP_POINTS=%s\n'        '${{ secrets.MAX_MAP_POINTS }}'
               printf 'MAX_EXPORT_ROWS=%s\n'       '${{ secrets.MAX_EXPORT_ROWS }}'
             } > .env

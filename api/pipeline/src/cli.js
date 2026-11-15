@@ -18,6 +18,7 @@ import { importCsvFilesToDatabase } from './db/import.js';
 import { rebuildDatasetFromDatabase } from './db/rebuild.js';
 import { runPipelineFromCsvFiles } from './pipeline/run.js';
 import { fetchCurrentHotspots, refreshRealData } from './nrt/refresh.js';
+import { runGlobalIngestion } from './global/ingest.js';
 
 const HELP = `
 CarcarÃ¡ pipeline worker
@@ -27,6 +28,7 @@ Usage:
   node pipeline/src/cli.js nrt [--days 2] [--regions pantanal,cerrado] [--json]
   node pipeline/src/cli.js backfill [options]
   node pipeline/src/cli.js bootstrap [options]
+  node pipeline/src/cli.js global [options]
   node pipeline/src/cli.js status [--json]
 
 Commands:
@@ -34,6 +36,7 @@ Commands:
   nrt         Fetch the latest FIRMS NRT data, merge it with stored history and rebuild
   backfill    Download historical FIRMS SP data in 5-day chunks with a resumable checkpoint
   bootstrap   Populate an empty database with historical MODIS/VIIRS data and build data/real
+  global      Download the worldwide FIRMS archive into data/db/global.sqlite
   status      Show dataset availability and NRT status
 
 Backfill options:
@@ -67,8 +70,26 @@ Bootstrap options:
   --rebuild-only              Skip downloads/API and rebuild data/real from SQLite
   --reset                     Recreate the SQLite database and checkpoints
 
+Global options:
+  --countries all|Brazil,Peru Country list (default: all)
+  --start-year 2000           First historical year
+  --end-year YYYY             Last historical year (default: current year - 1)
+  --sources MODIS_SP,...      Historical sources (default: MODIS + VIIRS)
+  --grid 10                   World grid size in degrees (5-60)
+  --max-files N               Limit downloads for a pilot (checkpoint resumes)
+  --max-import-files N        Limit CSV imports for a pilot
+  --current                   Also fetch the current NRT window (requires FIRMS_MAP_KEY)
+  --tile-degrees 30           Tile size for the global NRT requests
+  --allow-partial             Rebuild even if downloads/imports are incomplete (default)
+  --strict                    Fail when downloads/imports are incomplete
+  --rebuild-only              Skip downloads and rebuild clusters/calibration
+  --dry-run                   Show the download plan without writing data
+  --reset                     Recreate the global database and checkpoints
+
 Environment:
-  Loaded from the project root .env. FIRMS_MAP_KEY is required for NRT/bootstrap/backfill.
+  Loaded from the project root .env. FIRMS_MAP_KEY is required for NRT/bootstrap/backfill
+  and for the global --current option. Global paths can be overridden with GLOBAL_DB_PATH,
+  GLOBAL_RAW_DIR, GLOBAL_STATUS_FILE, GLOBAL_REGIONS_FILE and GLOBAL_CALIBRATION_FILE.
 `;
 
 function parseNumber(value, fallback) {
@@ -398,6 +419,73 @@ async function commandNrt(values) {
   }
 }
 
+async function commandGlobal(values) {
+  const config = await loadConfig({});
+  const countries = values.countries === undefined
+    ? 'all'
+    : values.countries === 'all'
+      ? 'all'
+      : String(values.countries)
+          .split(',')
+          .map((country) => country.trim())
+          .filter(Boolean);
+  const sources = values.sources
+    ? String(values.sources).split(',').map((item) => item.trim()).filter(Boolean)
+    : undefined;
+
+  const result = await runGlobalIngestion({
+    config,
+    countries,
+    startYear: values['start-year'] ? Number(values['start-year']) : undefined,
+    endYear: values['end-year'] ? Number(values['end-year']) : undefined,
+    sources,
+    gridDegrees: values.grid ? Number(values.grid) : undefined,
+    nrtTileDegrees: values['tile-degrees'] ? Number(values['tile-degrees']) : undefined,
+    maxFiles: values['max-files'] ? Number(values['max-files']) : undefined,
+    maxImportFiles: values['max-import-files']
+      ? Number(values['max-import-files'])
+      : undefined,
+    includeCurrent: Boolean(values.current) && !values['no-current'],
+    currentDays: values.days ? Number(values.days) : undefined,
+    allowPartial: !values.strict,
+    dryRun: Boolean(values['dry-run']),
+    reset: Boolean(values.reset),
+    rebuildOnly: Boolean(values['rebuild-only']),
+    logger: values.json ? silentLogger : console,
+  });
+
+  if (values.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (result.dryRun) {
+    console.log('Global ingestion plan');
+    console.log(`  Countries:   ${result.countries === 'all' ? 'all' : result.countries.join(', ')}`);
+    console.log(`  Grid:        ${result.gridDegrees}° (${result.regions} cells)`);
+    console.log(`  Planned:     ${result.history?.planned ?? 0} files`);
+    console.log(`  Output:      ${result.rawDir}`);
+    console.log(`  Database:    ${result.databaseFile}`);
+    return;
+  }
+
+  console.log('Global ingestion complete.');
+  console.log(`  Countries:    ${result.countries === 'all' ? 'all' : result.countries.join(', ')}`);
+  console.log(`  Grid:         ${result.gridDegrees}° (${result.regionsWithData}/${result.regions} cells with data)`);
+  console.log(`  Hotspots:     ${result.hotspots}`);
+  console.log(`  Clusters:     ${result.clusters}`);
+  console.log(`  Partial:      ${result.partial ? 'yes' : 'no'}`);
+  console.log(`  Database:     ${result.databaseFile}`);
+  console.log(`  Calibration:  ${result.calibration.file}`);
+  if (result.history) {
+    console.log(`  Downloaded:   ${result.history.downloaded} (${result.history.skipped} skipped)`);
+    console.log(`  Errors:       ${result.history.errors.count}`);
+  }
+  if (result.current) {
+    console.log(`  Current NRT:  ${result.current.fetched} hotspots`);
+  }
+}
+
 async function commandStatus(values) {
   const config = await loadConfig({});
   const stored = await readJson(config.nrt.statusFile, null);
@@ -414,6 +502,23 @@ async function commandStatus(values) {
       // The database may be locked or mid-import; report availability only.
     }
   }
+  let globalDatabase = {
+    available: existsSync(config.global.databaseFile),
+    filePath: config.global.databaseFile,
+    hotspots: 0,
+    clusters: 0,
+  };
+  if (globalDatabase.available) {
+    try {
+      globalDatabase = {
+        ...globalDatabase,
+        ...readDatabaseStats(config.global.databaseFile),
+      };
+    } catch {
+      // Same as above: the global database may be mid-import.
+    }
+  }
+  const globalStatus = await readJson(config.global.statusFile, null);
   const status = {
     mode: config.mode,
     availability: {
@@ -421,6 +526,12 @@ async function commandStatus(values) {
       real: { available: existsSync(path.join(config.realDir, 'calendario.json')) },
     },
     database,
+    global: {
+      database: globalDatabase,
+      status: globalStatus,
+      regionsFile: config.global.regionsFile,
+      calibrationFile: config.global.calibrationFile,
+    },
     nrt: {
       enabled: config.nrt.enabled,
       intervalMinutes: config.nrt.intervalMinutes,
@@ -446,6 +557,8 @@ async function commandStatus(values) {
   console.log(`Real dataset: ${status.availability.real.available ? 'available' : 'missing'}`);
   console.log(`SQLite: ${status.database.available ? `${status.database.hotspots} hotspots, ${status.database.clusters} clusters` : 'missing'}`);
   console.log(`SQLite file: ${status.database.filePath}`);
+  console.log(`Global SQLite: ${status.global.database.available ? `${status.global.database.hotspots} hotspots, ${status.global.database.clusters} clusters` : 'missing'}`);
+  console.log(`Global status: ${status.global.status?.running ? `running (${status.global.status.phase})` : status.global.status?.error ? 'error' : 'idle'}`);
   console.log(`NRT enabled: ${status.nrt.enabled ? 'yes' : 'no'}`);
   console.log(`FIRMS key: ${status.nrt.keyConfigured ? 'configured' : 'missing'}`);
   if (stored) {
@@ -479,12 +592,17 @@ async function main() {
       'no-current': { type: 'boolean', default: false },
       'allow-partial': { type: 'boolean', default: false },
       country: { type: 'string' },
+      countries: { type: 'string' },
       'start-year': { type: 'string' },
       'end-year': { type: 'string' },
       'feature-months': { type: 'string' },
       'csv-dir': { type: 'string' },
       'max-files': { type: 'string' },
       'max-import-files': { type: 'string' },
+      grid: { type: 'string' },
+      'tile-degrees': { type: 'string' },
+      current: { type: 'boolean', default: false },
+      strict: { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -510,6 +628,10 @@ async function main() {
   }
   if (command === 'bootstrap') {
     await commandBootstrap(values);
+    return;
+  }
+  if (command === 'global') {
+    await commandGlobal(values);
     return;
   }
   if (command === 'status') {

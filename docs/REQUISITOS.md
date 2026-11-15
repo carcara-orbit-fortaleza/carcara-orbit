@@ -3,8 +3,8 @@
 Auditoria feita sobre o estado do monorepo após a integração de `api/` e `web/`,
 a entrada do Postgres e a estrutura de CI/CD.
 
-> **Escopo desta entrega:** infraestrutura, banco, CI/CD e verificação. Nenhuma
-> alteração de layout foi feita em `web/`.
+> **Escopo desta entrega:** infraestrutura, banco, CI/CD, ingestão global na API
+> e verificação. Nenhuma alteração de layout foi feita em `web/`.
 
 ## Resumo executivo
 
@@ -16,7 +16,7 @@ a entrada do Postgres e a estrutura de CI/CD.
 | Exportação CSV | **Atendido** (calendário, focos e GeoJSON da AOI) |
 | Seleção de região e período | **Parcial** (regiões predefinidas, bbox na API, período limitado na UI) |
 | Cores acessíveis | **Parcial** (rampas existentes, sem auditoria WCAG formal) |
-| **Escopo global (histórico e solução)** | **Não atendido** (Brasil como padrão em dados, regiões e UI) |
+| **Escopo global (histórico e solução)** | **Atendido na API**; web ainda Brasil (sem alteração de layout) e carga global é operacional |
 | Produção: Postgres, backup, health | **Atendido na infraestrutura**; série analítica ainda em SQLite |
 | CI/CD com deploy em VPS | **Atendido** (workflow + runbook) |
 
@@ -57,19 +57,21 @@ a carga histórica. O repositório não versiona os CSVs baixados nem o SQLite
 
 ### 3. Selecionar uma área de interesse e um intervalo de datas
 
-**Parcial.**
+**Parcial (backend global completo; UI limitada).**
 
 - A API aceita `bbox=west,south,east,north`, `region`, `sensor`, `from` e `to`
   em `/api/hotspots` e `/api/export/hotspots.csv`.
+- `GET /api/global/calendar` e `/api/global/hotspots` aceitam **qualquer bbox
+  do mundo** ou uma célula da grade, resolvendo a limitação do dataset Brasil.
 - A web permite desenhar um polígono sobre o mapa e escolher entre regiões
   predefinidas; o calendário é filtrado pela interseção do polígono com os
   biomas.
 - O calendário na UI oferece apenas “série completa” ou “últimos 10 anos”;
   não há seletor arbitrário de datas na interface.
-- `/api/calendar` exige `region`; não existe calendário para uma bbox livre.
+- `/api/calendar` (dataset Brasil) exige `region`; o equivalente global não.
 
-**Lacuna:** para uma AOI global arbitrária, falta um endpoint de calendário por
-bbox/polígono e uma UI correspondente.
+**Lacuna:** a UI ainda não consome os endpoints globais nem oferece seletor
+livre de período; isso depende de mudança de layout, que não foi feita.
 
 ### 4. Comparar o período atual com medianas históricas e anomalias
 
@@ -103,38 +105,44 @@ bbox/polígono e uma UI correspondente.
 
 ### 7. Escopo global (requisito explícito desta revisão)
 
-**Não atendido.**
+**Atendido na API; parcial na experiência.**
 
-Evidências do viés Brasil:
+A ingestão global foi implementada como uma trilha separada do dataset Brasil,
+sem alterar `web/`:
 
-| Camada | Evidência |
+| Camada | Implementação |
 | --- | --- |
-| Pipeline | `FIRMS_COUNTRY=Brazil` é o padrão; o bootstrap baixa CSVs anuais por país |
-| Regiões | `pipelines/config/regions.json` contém apenas os 6 biomas brasileiros |
-| API | Datasets e calendários são por região predefinida; `/api/calendar` exige `region` |
-| Web | `BRAZIL_BBOX = '-74,-34,-34,6'`; mapa centralizado em `[-14.5, -54]`; textos e globo citam Brasil |
-| Dados | Importação histórica global não é automatizada; não há tabela/partição global nem tiles |
+| Fonte histórica | Índice mundial `FIRMS` por país: 238 países, 10.095 CSVs, 2000–2025, ~43,5 GB |
+| Banco | `data/db/global.sqlite`, separado do `firms.sqlite` do Brasil |
+| Modelo | Grade mundial de 10° (648 células), configurável de 5° a 60°, com IDs, polígonos e centros |
+| Atribuição | `gridRegionAt()` resolve a célula por latitude/longitude sem varrer polígonos |
+| Clusters/calibração | Mesmos algoritmos do Brasil, com fatores VIIRS/MODIS por célula e mês |
+| NRT | `--current` consulta a janela atual em tiles globais (30° por padrão) |
+| API | `/api/global/status`, `/regions`, `/calendar`, `/hotspots`, exports e ingestão em background |
+| Operação | Checkpoints de download/importação, retomada, log e registro em `operation_runs` |
 
-O que já é globalizável hoje:
+Recursos disponíveis globalmente:
 
-- `FIRMS_COUNTRY` e `--country` permitem importar outro país (um por vez).
-- `--bbox` do backfill aceita qualquer recorte suportado pela API FIRMS.
-- `/api/hotspots` e a exportação de focos aceitam bbox livre.
-- `REGIONS_FILE` (novo) permite apontar o pipeline para um GeoJSON de regiões
-  próprio, sem alterar código.
+- `POST /api/global/ingest` dispara a carga histórica mundial ou um piloto
+  (`maxFiles`, `maxImportFiles`, `dryRun`).
+- `GET /api/global/calendar?region=g_...` ou `?bbox=...` devolve o calendário
+  harmonizado para qualquer célula ou área do planeta.
+- `GET /api/global/hotspots?bbox=...` e os exports CSV atendem qualquer AOI.
+- `POST /api/global/ingest` com `includeCurrent=true` atualiza o ano corrente
+  pela API NRT.
 
-O que falta para cumprir o requisito:
+Limitações que permanecem:
 
-1. **Ingestão global**: definir uma fonte global (FIRMS archive/tiles ou
-   partições por país) e um job de carga idempotente, com checkpoint.
-2. **Modelo global**: substituir “biomas do Brasil” por uma grade global
-   (ex.: células de 0,5° ou 1°) e/ou regiões administrativas, com PostGIS.
-3. **Consultas por AOI**: calendário e métricas para bbox/polígono arbitrários,
-   não só para regiões predefinidas.
-4. **UI global**: mapa-múndi, busca por coordenadas e seletor de país/região —
-   depende de mudança de layout, fora do escopo desta entrega.
-5. **Operação**: migrar a série analítica de SQLite para Postgres/PostGIS e
-   definir retenção, índices e partições.
+1. **Web**: a interface continua com `BRAZIL_BBOX`, mapa centrado no Brasil e
+   seis biomas. Por instrução, nenhuma alteração de layout foi feita.
+2. **Dados**: a carga global não roda automaticamente no deploy; a operação
+   precisa executar o job (dezenas de GB) e acompanhar `/api/global/status`.
+3. **Escala**: a série analítica ainda está em SQLite; para consultas
+   concorrentes/particionadas em escala global, o próximo passo é PostGIS.
+4. **Cobertura**: o índice histórico cobre MODIS, VIIRS S-NPP e JPSS1/NOAA-20;
+   NOAA-21 entra via NRT.
+
+O runbook está em [`GLOBAL.md`](./GLOBAL.md).
 
 ### 8. Dados reais e operação em produção
 
@@ -147,6 +155,8 @@ O que falta para cumprir o requisito:
 - Postgres foi adicionado para saúde, migrações e histórico operacional
   (`operation_runs`, exposto em `/api/runs`, protegido por `ADMIN_TOKEN` quando
   configurado), com backup diário em produção.
+- A ingestão global grava em `data/db/global.sqlite`, persistido no volume
+  `api_data`, e registra o job no Postgres.
 - A série analítica **ainda não está no Postgres**; essa migração é o próximo
   passo para escala global e múltiplas réplicas.
 
@@ -162,29 +172,30 @@ consegue autenticar. Isso já existia antes desta entrega e não foi alterado.
 
 **Atendido no que existe.**
 
-- 10 testes unitários da API (`npm test`).
-- 24 testes do pipeline (`npm run pipeline:test`).
-- 13 casos e2e (`npm run test:e2e`), incluindo modo real e exportações.
+- 14 testes unitários da API (`npm test`), incluindo a grade e consultas globais.
+- 30 testes do pipeline (`npm run pipeline:test`), incluindo ingestão global e NRT por tiles.
+- 15 casos e2e (`npm run test:e2e`), incluindo modo real, exportações e endpoints globais.
 - CI executa lint dos dois apps, build, testes unitários, testes do pipeline,
   e2e, migrações em Postgres, smoke test da API e build das imagens Docker.
 
 ## Roadmap sugerido (ordem de impacto)
 
-1. **PostGIS + grade global**: migrar hotspots/clusters para Postgres, com
-   partições por ano e índices espaciais; importar a série global.
-2. **API por AOI**: `GET /api/calendar?bbox=...` e métricas calculadas por
-   bbox/polígono, reutilizando a mesma base harmonizada.
-3. **Ingestão global resiliente**: job de carga com checkpoint, retomada e
-   validação de cobertura por país/região.
-4. **UI global** (quando houver autorização para alterar layout): mapa-múndi,
-   busca por coordenadas, seletor de período livre.
-5. **Autenticação real** do painel (ou remoção da tela de login enquanto não
+1. **Carga global operacional**: executar o job mundial na VPS em piloto, validar
+   cobertura por país e acompanhar disco/tempo; hoje a API está pronta, mas os
+   dados não são carregados automaticamente.
+2. **PostGIS + partições**: migrar hotspots/clusters globais para Postgres, com
+   índices espaciais e partições por ano, para consultas concorrentes em escala.
+3. **UI global** (quando houver autorização para alterar layout): mapa-múndi,
+   busca por coordenadas, seletor de período livre e uso dos endpoints globais.
+4. **Autenticação real** do painel (ou remoção da tela de login enquanto não
    houver backend de auth).
 
 ## Conclusão
 
-O projeto atende bem ao núcleo metodológico do desafio — harmonização,
-calendário, anomalias e exportação — e agora tem base de produção com Postgres,
-backup e CI/CD. **O requisito de escopo global ainda não está atendido**: o
-sistema é configurável para outros recortes, mas a experiência, os dados padrão,
-as regiões e a interface continuam centrados no Brasil.
+O projeto atende ao núcleo metodológico do desafio — harmonização, calendário,
+anomalias e exportação — e agora tem base de produção com Postgres, backup,
+CI/CD e uma trilha de ingestão global na API. O escopo global está **atendido no
+backend** (histórico mundial por país, grade, calibração e consultas por AOI);
+o que falta é operacionalizar a carga completa e, quando permitido, expor essa
+capacidade na interface. A web permanece intencionalmente inalterada nesta
+entrega.

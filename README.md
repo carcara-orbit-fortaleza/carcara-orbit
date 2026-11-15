@@ -1,8 +1,9 @@
 # Carcará Orbit
 
 Monorepo do Carcará Orbit: painel e API de monitoramento de focos de calor.
-A instância atual usa dados e regiões do Brasil; o backend aceita outros países,
-recortes e arquivos de regiões (ver [`docs/REQUISITOS.md`](./docs/REQUISITOS.md)).
+A web atual usa dados e regiões do Brasil; a API também oferece uma trilha de
+ingestão e consulta global (ver [`docs/GLOBAL.md`](./docs/GLOBAL.md) e
+[`docs/REQUISITOS.md`](./docs/REQUISITOS.md)).
 
 | Pasta | Stack | Descrição |
 | --- | --- | --- |
@@ -46,6 +47,7 @@ docker compose up --build
 | Web | http://localhost:5173 |
 | API (health) | http://localhost:3000/api/health |
 | API (meta) | http://localhost:3000/api/meta |
+| API (global) | http://localhost:3000/api/global/status |
 | API (execuções) | http://localhost:3000/api/runs (admin quando `ADMIN_TOKEN` está definido) |
 | Postgres | `localhost:5432` (somente dev) |
 
@@ -78,6 +80,43 @@ O diretório `api/data` é o volume de trabalho do pipeline (`raw`, `real`, `db`
 `runtime`) e é persistido no volume `api_data` em produção. Detalhes em
 [`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) e
 [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md).
+
+## Ingestão global (API)
+
+A API possui uma trilha global separada do dataset Brasil usado pela web:
+
+- baixa o histórico mundial da FIRMS (238 países, ~10 mil CSVs, ~43,5 GB);
+- importa para `data/db/global.sqlite`, com checkpoint e retomada;
+- atribui cada foco a uma grade mundial (padrão 10°, 648 células);
+- calcula clusters e calibração VIIRS/MODIS por célula/mês;
+- expõe calendário, focos e CSV para qualquer célula ou bbox em `/api/global/*`;
+- opcionalmente busca o NRT atual em tiles globais (`FIRMS_MAP_KEY`).
+
+```bash
+# Plano (não baixa)
+docker compose exec api npm run global -- --dry-run --countries all --grid 10
+
+# Piloto com 20 arquivos
+docker compose exec api npm run global -- --countries all --max-files 20
+
+# Carga completa + NRT atual
+docker compose exec api npm run global -- --countries all --current
+```
+
+Endpoints principais:
+
+| Rota | Descrição |
+| --- | --- |
+| `GET /api/global/status` | cobertura, grade, calibração e status do job |
+| `GET /api/global/calendar?region=&bbox=&from=&to=` | calendário global harmonizado |
+| `GET /api/global/hotspots?region=&bbox=&from=&to=&sensor=` | focos globais |
+| `GET /api/global/export/hotspots.csv?...` | CSV global |
+| `POST /api/global/ingest` | dispara a ingestão em background (admin) |
+| `GET /api/global/ingest/status` | progresso do job |
+
+A base global é independente do dataset Brasil: a web e suas seis regiões
+continuam funcionando sem alterações. O runbook completo está em
+[`docs/GLOBAL.md`](./docs/GLOBAL.md).
 
 ## Produção
 
@@ -134,7 +173,9 @@ npm run dev              # http://localhost:5173
 | --- | --- |
 | `docker compose up --build` | Sobe dev com hot reload |
 | `docker compose logs -f api` | Acompanha os logs da API |
-| `docker compose exec api npm run bootstrap` | Baixa/importa o histórico FIRMS |
+| `docker compose exec api npm run bootstrap` | Baixa/importa o histórico FIRMS do Brasil |
+| `docker compose exec api npm run global -- --dry-run --countries all` | Plano da ingestão mundial |
+| `docker compose exec api npm run global -- --countries all --max-files 20` | Piloto da ingestão mundial |
 | `docker compose exec api npm run pipeline` | Roda o pipeline histórico |
 | `docker compose exec api npm run db:migrate` | Aplica migrações pendentes |
 | `docker compose exec api npm test` | Testes unitários da API |
@@ -143,8 +184,8 @@ npm run dev              # http://localhost:5173
 
 ## Documentação
 
-- [`docs/REQUISITOS.md`](./docs/REQUISITOS.md) — aderência ao desafio, incluindo
-  a lacuna de escopo global e o roadmap.
+- [`docs/GLOBAL.md`](./docs/GLOBAL.md) — ingestão global, grade, endpoints e operação.
+- [`docs/REQUISITOS.md`](./docs/REQUISITOS.md) — aderência ao desafio e roadmap.
 - [`docs/DEPLOY.md`](./docs/DEPLOY.md) — VPS, secrets, migrações, backup/restore.
 - [`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) — dados reais e NRT.
 - [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md) — pipeline FIRMS.

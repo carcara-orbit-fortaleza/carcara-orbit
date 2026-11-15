@@ -59,6 +59,7 @@ async function importOneFile({
   db,
   filePath,
   config,
+  gridDegrees,
   onBatch,
 }) {
   const headerStream = createReadStream(filePath, { encoding: 'utf8' });
@@ -107,6 +108,7 @@ async function importOneFile({
       viirsMinClass: config.firms.viirsMinClass,
       methodVersion: config.methodVersion,
       keepOutsideRegions: true,
+      gridDegrees,
       index: rowIndex - 1,
     });
     if (!result.hotspot) {
@@ -141,6 +143,8 @@ export async function importCsvFilesToDatabase({
   logger = console,
   maxFiles,
   reset = false,
+  gridDegrees = null,
+  onProgress = null,
 } = {}) {
   if (!db) throw new Error('A database connection is required.');
   if (!inputDir) throw new Error('An input directory is required.');
@@ -165,6 +169,16 @@ export async function importCsvFilesToDatabase({
       previous?.mtimeMs === info.mtimeMs
     ) {
       skipped += 1;
+      onProgress?.({
+        totalFiles: files.length,
+        processed: imported + skipped,
+        imported,
+        skipped,
+        rows,
+        kept,
+        errors,
+        current: relative,
+      });
       continue;
     }
 
@@ -173,6 +187,7 @@ export async function importCsvFilesToDatabase({
         db,
         filePath,
         config,
+        gridDegrees,
         onBatch: async (batch) => {
           await upsertHotspots(db, batch);
         },
@@ -192,6 +207,16 @@ export async function importCsvFilesToDatabase({
           `Imported ${imported}/${files.length} files · ${rows} rows · ${kept} hotspots kept`,
         );
       }
+      onProgress?.({
+        totalFiles: files.length,
+        processed: imported + skipped,
+        imported,
+        skipped,
+        rows,
+        kept,
+        errors,
+        current: relative,
+      });
     } catch (error) {
       errors += 1;
       checkpoint.files[relative] = {
@@ -201,6 +226,17 @@ export async function importCsvFilesToDatabase({
       };
       await saveCheckpoint(checkpointFile, checkpoint);
       logger.warn?.(`Import failed for ${relative}: ${error.message}`);
+      onProgress?.({
+        totalFiles: files.length,
+        processed: imported + skipped,
+        imported,
+        skipped,
+        rows,
+        kept,
+        errors,
+        current: relative,
+        currentError: error.message,
+      });
     }
   }
 

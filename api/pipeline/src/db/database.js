@@ -106,6 +106,8 @@ export function openFirmsDatabase({ filePath, reset = false } = {}) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_hotspots_ts ON hotspots(ts_ms);
+    CREATE INDEX IF NOT EXISTS idx_hotspots_latlon ON hotspots(lat, lon);
+    CREATE INDEX IF NOT EXISTS idx_hotspots_region ON hotspots(region_id);
 
     CREATE TABLE IF NOT EXISTS clusters (
       id TEXT PRIMARY KEY,
@@ -138,6 +140,7 @@ export function openFirmsDatabase({ filePath, reset = false } = {}) {
     CREATE INDEX IF NOT EXISTS idx_clusters_month ON clusters(year, month);
     CREATE INDEX IF NOT EXISTS idx_clusters_region_month ON clusters(region_id, year, month);
     CREATE INDEX IF NOT EXISTS idx_clusters_ts ON clusters(ts_ms);
+    CREATE INDEX IF NOT EXISTS idx_clusters_latlon ON clusters(lat, lon);
   `);
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('schema_version', '1');
   return db;
@@ -145,6 +148,18 @@ export function openFirmsDatabase({ filePath, reset = false } = {}) {
 
 export function closeFirmsDatabase(db) {
   db?.close?.();
+}
+
+export function setMeta(db, key, value) {
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(
+    key,
+    String(value),
+  );
+}
+
+export function getMeta(db, key) {
+  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
+  return row?.value ?? null;
 }
 
 export function readDatabaseStats(filePath) {
@@ -207,6 +222,14 @@ export function countHotspots(db) {
 
 export function countClusters(db) {
   return db.prepare('SELECT COUNT(*) AS count FROM clusters').get().count;
+}
+
+export function countDistinctRegions(db) {
+  return db
+    .prepare(
+      'SELECT COUNT(DISTINCT region_id) AS count FROM hotspots WHERE region_id IS NOT NULL',
+    )
+    .get().count;
 }
 
 export function listHotspotSources(db) {

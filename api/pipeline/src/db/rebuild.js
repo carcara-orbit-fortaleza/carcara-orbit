@@ -23,7 +23,10 @@ function hotspotRow(row) {
   return hotspot;
 }
 
-export async function refreshClusters(db, { logger = console, months: onlyMonths } = {}) {
+export async function refreshClusters(
+  db,
+  { logger = console, months: onlyMonths, onProgress = null } = {},
+) {
   const selected = onlyMonths ? new Set(onlyMonths.map((entry) => `${entry.year}-${entry.month}`)) : null;
   const months = listHotspotMonths(db).filter(
     (entry) => !selected || selected.has(`${entry.year}-${entry.month}`),
@@ -43,6 +46,11 @@ export async function refreshClusters(db, { logger = console, months: onlyMonths
     if (processed % 12 === 0) {
       logger.info?.(`Clustered ${processed}/${months.length} months · ${clusters} clusters`);
     }
+    await onProgress?.({
+      totalMonths: months.length,
+      processedMonths: processed,
+      clusters,
+    });
   }
   return { months: processed, clusters };
 }

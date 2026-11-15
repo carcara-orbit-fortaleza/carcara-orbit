@@ -51,6 +51,11 @@ basta remover a variável.
 | `FIRMS_SOURCES` | MODIS/VIIRS NRT | fontes do NRT |
 | `FIRMS_COUNTRY` | `Brazil` | país do bootstrap histórico |
 | `REGIONS_FILE` | regiões do repo | GeoJSON de regiões customizado |
+| `GLOBAL_GRID_DEGREES` | `10` | grade da ingestão mundial (5–60) |
+| `GLOBAL_NRT_TILE_DEGREES` | `30` | tiles do NRT global |
+| `GLOBAL_START_YEAR` | `2000` | início da carga global |
+| `GLOBAL_END_YEAR` | ano anterior | fim da carga global |
+| `GLOBAL_MAX_FILES` | ilimitado | limite de arquivos por execução |
 | `MAX_MAP_POINTS` | `2000` | limite do GeoJSON de mapa |
 | `MAX_EXPORT_ROWS` | `50000` | limite de exportação |
 
@@ -137,8 +142,46 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   --env-file .env exec -T api npm run bootstrap
 ```
 
-Depois, ajuste `DATA_SOURCE=real` e reinicie a API. O caminho para escala global
-(Postgres/PostGIS) está detalhado em [`REQUISITOS.md`](./REQUISITOS.md).
+Depois, ajuste `DATA_SOURCE=real` e reinicie a API.
+
+### Ingestão global
+
+A trilha mundial grava em `data/db/global.sqlite` e não interfere no dataset
+Brasil. Na VPS:
+
+```bash
+cd ~/dev/carcara-orbit
+
+# 1. Piloto (não baixa os ~43 GB)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --env-file .env exec -T api npm run global -- \
+  --dry-run --countries all --grid 10 --max-files 20 --json
+
+# 2. Carga em lotes (retomável)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --env-file .env exec -T api npm run global -- \
+  --countries all --grid 10 --max-files 200
+
+# 3. Repetir até completar; acompanhar
+curl https://$APP_HOST/api/global/status
+
+# 4. Atualização NRT do ano corrente (requer FIRMS_MAP_KEY)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --env-file .env exec -T api npm run global -- --current --grid 10
+```
+
+Também é possível disparar pela API:
+
+```bash
+curl -X POST https://$APP_HOST/api/global/ingest \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -d '{"countries":"all","maxFiles":200,"gridDegrees":10}'
+```
+
+Acompanhe `data/db/global.sqlite`, `data/runtime/global-download.json` e
+`data/runtime/global-ingestion.json` no volume `api_data`. O caminho para
+PostGIS e escala está em [`REQUISITOS.md`](./REQUISITOS.md).
 
 ## Rollback
 

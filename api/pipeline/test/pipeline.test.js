@@ -146,6 +146,6 @@ test('runPipelineFromCsvFiles writes a complete real dataset', async () => {
     assert.equal(runMeta.input_hotspots, result.inputHotspots);
     assert.equal(runMeta.clusters, result.clusters);
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

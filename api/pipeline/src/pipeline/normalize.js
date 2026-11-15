@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { normalizeHeader, parseCsv, parseCsvObjects } from '../lib/csv.js';
 import { assignRegion } from '../lib/geo.js';
+import { gridRegionAt } from '../lib/grid.js';
 import { AppError } from '../lib/errors.js';
 
 const CONFIDENCE_CLASSES = new Set(['baixa', 'nominal', 'alta']);
@@ -93,6 +94,7 @@ export function normalizeFirmsRecord(record, {
   viirsMinClass = 'nominal',
   methodVersion = 'h1.0',
   keepOutsideRegions = false,
+  gridDegrees = null,
   index = 0,
 } = {}) {
   if (!sensor) {
@@ -133,9 +135,14 @@ export function normalizeFirmsRecord(record, {
   const resolution = Number(record.resolution_m ?? sourceMeta?.resolutionM ?? (sensor === 'MODIS' ? 1000 : 375));
   const brightness = Number(record.brightness ?? record.bright_ti4 ?? record.bright_ti5 ?? record.brightness_k);
   const frp = Number(record.frp ?? record.frp_mw);
-  const region = regions.length > 0 ? assignRegion({ lat, lon }, regions) : null;
+  const region =
+    gridDegrees !== null && gridDegrees !== undefined
+      ? gridRegionAt(lat, lon, gridDegrees)
+      : regions.length > 0
+        ? assignRegion({ lat, lon }, regions)
+        : null;
 
-  if (regions.length > 0 && !region && !keepOutsideRegions) {
+  if (regions.length > 0 && !gridDegrees && !region && !keepOutsideRegions) {
     return { skipped: 'outside' };
   }
 
@@ -178,6 +185,7 @@ export function normalizeFirmsCsv(text, {
   viirsMinClass = 'nominal',
   methodVersion = 'h1.0',
   keepOutsideRegions = false,
+  gridDegrees = null,
 } = {}) {
   const detectedSensor = sensor ?? detectSensor(text, { sourceMeta, fileName });
   if (!detectedSensor) {
@@ -206,6 +214,7 @@ export function normalizeFirmsCsv(text, {
       viirsMinClass,
       methodVersion,
       keepOutsideRegions,
+      gridDegrees,
       index,
     });
     if (!result.hotspot) {

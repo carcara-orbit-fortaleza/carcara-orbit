@@ -167,11 +167,15 @@ export function calibrateFactorsFromCellCounts(cellCounts, {
   const minCells = calibration.minCells ?? 30;
   const ratiosByMonth = {};
   const modes = {};
+  const rowsByRegion = new Map();
+  for (const row of cellCounts) {
+    if (row.year < startYear || row.year > endYear) continue;
+    if (!rowsByRegion.has(row.region_id)) rowsByRegion.set(row.region_id, []);
+    rowsByRegion.get(row.region_id).push(row);
+  }
 
   for (const region of regions) {
-    const rows = cellCounts.filter(
-      (row) => row.region_id === region.id && row.year >= startYear && row.year <= endYear,
-    );
+    const rows = rowsByRegion.get(region.id) ?? [];
     const counts = regionClusterCounts[region.id] ?? {};
     const total = Number(counts.total) || 0;
     const daytime = Number(counts.daytime) || 0;

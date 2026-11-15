@@ -11,8 +11,8 @@ const reducedMotion =
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead?: string; children: React.ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-titulo`} className="scroll-mt-20 py-12">
-      <h2 id={`${id}-titulo`} className="font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-20 py-12">
+      <h2 id={`${id}-title`} className="font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
         {title}
       </h2>
       {lead ? <p className="mt-3 max-w-prose text-(--fg-muted)">{lead}</p> : null}
@@ -39,31 +39,33 @@ export function Home() {
   const status = [t('statusDone'), t('statusDoing'), t('statusNext')]
 
   return (
-    <div id="topo">
+    <div id="top">
       {/* Abertura */}
-      {/* Ocupa a primeira tela inteira, descontando o cabeçalho. */}
       {/* Faixa de largura total: a nebulosa cobre a tela inteira, sem bordas visíveis. */}
-      <section aria-labelledby="hero-titulo" className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden">
+      <section aria-labelledby="hero-title" className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden">
         <div aria-hidden="true" className="nebula absolute inset-0" />
-        <div className="relative mx-auto flex max-w-6xl items-center px-4 py-8 md:min-h-[calc(100svh-3.5rem)] md:py-16">
-        <div className="grid w-full items-center gap-10 md:grid-cols-[1.1fr_1fr]">
+        <div className="relative mx-auto flex max-w-[66rem] flex-col justify-center px-4 py-6 md:py-8">
+        <div className="grid w-full items-center gap-10 md:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className="font-mono text-xs tracking-wider text-(--accent-2) uppercase">{t('heroKicker')}</p>
-            <h1 id="hero-titulo" className="mt-3 font-display text-[2rem] leading-[1.1] font-extrabold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+            <h1 id="hero-title" className="mt-3 font-display text-[2rem] leading-[1.1] font-extrabold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               {t('tagline')}
             </h1>
             <p className="mt-5 max-w-prose text-lg text-(--fg-muted)">{t('heroLead')}</p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <a href="#solucao" className="rounded-md bg-(--accent) px-4 py-2 text-sm font-semibold text-(--bg) hover:opacity-90">
+              <a href="/painel" className="rounded-md bg-(--accent) px-5 py-2.5 text-sm font-bold text-(--bg) hover:opacity-90">
+                {t('ctaDashboard')} →
+              </a>
+              <a href="#solution" className="rounded-md border border-(--line) px-4 py-2 text-sm font-semibold hover:border-(--accent)">
                 {t('ctaSolution')}
               </a>
-              <a href="#metodo" className="rounded-md border border-(--line) px-4 py-2 text-sm font-semibold hover:border-(--accent)">
+              <a href="#method" className="rounded-md border border-(--line) px-4 py-2 text-sm font-semibold hover:border-(--accent)">
                 {t('ctaMethod')}
               </a>
             </div>
           </div>
 
-          <div className="relative mx-auto aspect-square w-full max-w-[min(480px,70svh)]">
+          <div className="relative mx-auto aspect-square w-full max-w-[min(760px,88svh)]">
             <div className="absolute inset-0">
               <GlobeBoundary fallback={null}>
                 <Suspense fallback={null}>
@@ -77,27 +79,27 @@ export function Home() {
       </section>
 
       {/* Problema */}
-      <Section id="problema" title={t('problemTitle')} lead={t('problemLead')}>
+      <Section id="problem" title={t('problemTitle')} lead={t('problemLead')}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <article className="rounded-lg border border-(--line) bg-(--surface) p-5">
+          <article className="feature-card p-6 sm:p-7">
             <h3 className="font-mono text-xs tracking-wide text-(--accent-2) uppercase">{t('problemModisTitle')}</h3>
-            <p className="mt-2 text-(--fg-muted)">{t('problemModisBody')}</p>
+            <p className="mt-3 leading-relaxed text-(--fg-muted)">{t('problemModisBody')}</p>
           </article>
-          <article className="rounded-lg border border-(--line) bg-(--surface) p-5">
+          <article className="feature-card p-6 sm:p-7">
             <h3 className="font-mono text-xs tracking-wide text-(--accent-2) uppercase">{t('problemViirsTitle')}</h3>
-            <p className="mt-2 text-(--fg-muted)">{t('problemViirsBody')}</p>
+            <p className="mt-3 leading-relaxed text-(--fg-muted)">{t('problemViirsBody')}</p>
           </article>
         </div>
         <p className="mt-6 max-w-prose border-l-2 border-(--accent) pl-4 text-(--fg)">{t('problemJump')}</p>
       </Section>
 
       {/* Solução */}
-      <Section id="solucao" title={t('solutionTitle')} lead={t('solutionLead')}>
+      <Section id="solution" title={t('solutionTitle')} lead={t('solutionLead')}>
         <div className="grid gap-4 md:grid-cols-3">
           {pillars.map((p) => (
-            <StreakCard key={p.title} streaks={false} className="p-5">
-              <h3 className="font-display text-lg font-semibold">{p.title}</h3>
-              <p className="mt-2 text-sm text-(--fg-muted)">{p.body}</p>
+            <StreakCard key={p.title} streaks={false} className="p-6 sm:p-7">
+              <h3 className="font-display text-xl font-semibold tracking-tight">{p.title}</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-(--fg-muted)">{p.body}</p>
             </StreakCard>
           ))}
         </div>
@@ -115,15 +117,34 @@ export function Home() {
         </ul>
       </Section>
 
+      {/* Painel */}
+      <section id="painel" aria-labelledby="painel-title" className="scroll-mt-20 py-12">
+        <div className="feature-card flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div className="max-w-prose">
+            <p className="font-mono text-xs tracking-wider text-(--accent-2) uppercase">{t('dashKicker')}</p>
+            <h2 id="painel-title" className="mt-2 font-display text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+              {t('dashTitle')}
+            </h2>
+            <p className="mt-3 text-(--fg-muted)">{t('dashLead')}</p>
+          </div>
+          <a
+            href="/painel"
+            className="shrink-0 rounded-md bg-(--accent) px-5 py-2.5 text-center text-sm font-bold text-(--bg) hover:opacity-90"
+          >
+            {t('dashButton')} →
+          </a>
+        </div>
+      </section>
+
       {/* Método */}
-      <Section id="metodo" title={t('methodTitle')} lead={t('methodLead')}>
+      <Section id="method" title={t('methodTitle')} lead={t('methodLead')}>
         <ol className="grid gap-3 md:grid-cols-5">
           {steps.map((s, i) => (
             <li key={s.title}>
-              <StreakCard streaks={false} className="h-full p-4">
+              <StreakCard streaks={false} className="h-full p-5 sm:p-6">
                 <p className="font-mono text-xs text-(--accent-2)">{String(i + 1).padStart(2, '0')}</p>
-                <h3 className="mt-1 font-display font-semibold">{s.title}</h3>
-                <p className="mt-2 text-sm text-(--fg-muted)">{s.body}</p>
+                <h3 className="mt-2 font-display text-lg font-semibold tracking-tight">{s.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-(--fg-muted)">{s.body}</p>
               </StreakCard>
             </li>
           ))}
@@ -132,10 +153,10 @@ export function Home() {
       </Section>
 
       {/* Estado */}
-      <Section id="estado" title={t('statusTitle')} lead={t('statusLead')}>
+      <Section id="status" title={t('statusTitle')} lead={t('statusLead')}>
         <ul className="grid gap-3 sm:grid-cols-3">
           {status.map((s, i) => (
-            <li key={s} className="rounded-lg border border-(--line) bg-(--surface) p-4 text-sm">
+            <li key={s} className="feature-card p-5 text-sm sm:p-6">
               <span className="font-mono text-xs text-(--fg-muted)">{i === 0 ? '✓' : i === 1 ? '→' : '○'}</span>
               <p className="mt-2">{s}</p>
             </li>
@@ -144,10 +165,6 @@ export function Home() {
         <p className="mt-6 font-medium text-(--accent-2)">{t('statusNotOperational')}</p>
       </Section>
 
-      {/* Equipe */}
-      <Section id="equipe" title={t('teamTitle')}>
-        <p className="max-w-prose text-(--fg-muted)">{t('teamBody')}</p>
-      </Section>
     </div>
   )
 }

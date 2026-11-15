@@ -22,7 +22,7 @@ const STREAKS: { x: string; len: string; d: string; delay: string }[] = [
 export function StreakCard({ children, className = '', streaks = true }: StreakCardProps) {
   return (
     <div
-      className={`streak-card relative overflow-hidden rounded-lg border border-(--line) bg-(--surface) ${className}`}
+      className={`streak-card feature-card relative overflow-hidden ${className}`}
     >
       {streaks ? (
         <span aria-hidden="true" className="streak-layer">

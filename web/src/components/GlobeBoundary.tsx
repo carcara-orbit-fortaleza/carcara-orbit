@@ -19,7 +19,7 @@ export class GlobeBoundary extends Component<GlobeBoundaryProps, GlobeBoundarySt
   }
 
   componentDidCatch(error: unknown) {
-    console.error('Globo indisponível, usando arte estática.', error)
+    console.error('Globe unavailable, using static art.', error)
   }
 
   render() {

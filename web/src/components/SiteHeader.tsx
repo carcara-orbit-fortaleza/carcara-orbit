@@ -8,10 +8,10 @@ interface SiteHeaderProps {
 }
 
 const SECTIONS = [
-  { id: 'problema', key: 'navProblem' },
-  { id: 'solucao', key: 'navSolution' },
-  { id: 'metodo', key: 'navMethod' },
-  { id: 'estado', key: 'navStatus' },
+  { id: 'problem', key: 'navProblem' },
+  { id: 'solution', key: 'navSolution' },
+  { id: 'method', key: 'navMethod' },
+  { id: 'status', key: 'navStatus' },
 ] as const
 
 export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
@@ -42,17 +42,20 @@ export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-10 -mx-4 bg-(--bg)/90 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-(--bg)/70 md:py-3">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-        <a href="#topo" className="flex min-w-0 items-center gap-2 font-display text-base font-bold tracking-tight">
+        <a href="#top" className="flex min-w-0 items-center gap-2 font-display text-base font-bold tracking-tight">
           <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" aria-hidden="true" width={32} height={24} className="h-8 w-auto shrink-0" />
           <span className="truncate">{t('appName')}</span>
         </a>
 
-        <nav aria-label="Seções" className="hidden gap-x-4 text-sm md:flex">
+        <nav aria-label="Sections" className="hidden gap-x-4 text-sm md:flex">
           {SECTIONS.map((s) => (
             <a key={s.id} href={`#${s.id}`} className="text-(--fg-muted) hover:text-(--fg)">
               {t(s.key)}
             </a>
           ))}
+          <a href="/painel" className="font-semibold text-(--accent-2) hover:text-(--fg)">
+            {t('navDashboard')} →
+          </a>
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -90,7 +93,7 @@ export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
 
       {open ? (
         <div id="menu-movel" className="mx-auto mt-2 flex max-w-5xl flex-col gap-1 border-t border-(--line) pt-2 md:hidden">
-          <nav aria-label="Seções" className="flex flex-col">
+          <nav aria-label="Sections" className="flex flex-col">
             {SECTIONS.map((s) => (
               <a
                 key={s.id}
@@ -101,6 +104,9 @@ export function SiteHeader({ starfield, onToggleStarfield }: SiteHeaderProps) {
                 {t(s.key)}
               </a>
             ))}
+            <a href="/painel" className="flex min-h-11 items-center rounded px-1 font-semibold text-(--accent-2) hover:text-(--fg)">
+              {t('navDashboard')} →
+            </a>
           </nav>
           <div className="pb-2">{starfieldButton}</div>
         </div>

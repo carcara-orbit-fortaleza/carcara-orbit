@@ -22,12 +22,9 @@ function writeStoredLocale(locale: Locale) {
   }
 }
 
-// Sem preferência salva, usa o idioma do navegador: inglês se começar com "en", português nos demais casos.
+// English is the site default. Visitors can still switch to pt-BR, and that choice is saved.
 function detectLocale(): Locale {
-  if (typeof navigator !== 'undefined' && navigator.language.toLowerCase().startsWith('en')) {
-    return 'en'
-  }
-  return 'pt-BR'
+  return 'en'
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -47,7 +44,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const value = useMemo<I18nContextValue>(() => {
     const dictionary = messages[locale]
     // Caso falte uma chave em en, cai no português em vez de mostrar a chave crua.
-    const fallback = messages['pt-BR']
+    const fallback = messages.en
 
     const t = (key: MessageKey, vars?: Vars) => {
       const template: string = (dictionary as Record<string, string>)[key] ?? fallback[key]

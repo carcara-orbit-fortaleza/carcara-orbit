@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ActivityCalendar } from './components/ActivityCalendar'
 import { AnnualChart, ClimatologyChart } from './components/Charts'
 import { PolygonMap } from './components/PolygonMap'
+import { RiskCalculator } from './components/RiskCalculator'
 import { loadHotspots, loadWorkspace } from './data/api'
 import { dashboardForPolygon, dashboardForRegion } from './lib/dashboard'
 import { areaGeoJson, calendarCsv, download, hotspotCsv } from './lib/exportData'
@@ -18,6 +19,7 @@ const NAV = [
   { hash: '#calendario', icon: 'calendar', label: 'Calendário' },
   { hash: '#mapa', icon: 'map', label: 'Mapa de focos' },
   { hash: '#serie', icon: 'chart', label: 'Séries históricas' },
+  { hash: '#calculadora', icon: 'calc', label: 'Calculadora' },
   { hash: '#metodo', icon: 'info', label: 'Metodologia' },
 ] as const
 
@@ -254,6 +256,8 @@ export default function App() {
               </article>
             </section>
 
+            <RiskCalculator regions={data.regions} years={data.years} initialRegionId={region.id} />
+
             <section className="grid-bottom">
               <PolygonMap
                 regions={data.regions}
@@ -365,12 +369,13 @@ function signed(value: number): string {
   return `${value > 0 ? '+' : ''}${body}`
 }
 
-function Icon({ name }: { name: 'grid' | 'calendar' | 'map' | 'chart' | 'info' }) {
+function Icon({ name }: { name: 'grid' | 'calendar' | 'map' | 'chart' | 'calc' | 'info' }) {
   const paths: Record<typeof name, string> = {
     grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
     calendar: 'M4 6h16v14H4zM4 10h16M8 4v4M16 4v4',
     map: 'M4 7l5-2 6 2 5-2v14l-5 2-6-2-5 2zM9 5v14M15 7v14',
     chart: 'M4 19V5M4 19h16M8 15l4-5 3 3 5-7',
+    calc: 'M6 3h12v18H6zM9 7h6M9 11h2M13 11h2M9 15h2M13 15h2',
     info: 'M12 12a8 8 0 1 0 0 .01M12 11v5M12 8h.01',
   }
   return (

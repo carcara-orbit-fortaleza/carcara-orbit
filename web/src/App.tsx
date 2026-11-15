@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { StarField } from './components/StarField'
 import { SiteHeader } from './components/SiteHeader'
+import { SpaceFooter } from './components/SpaceFooter'
 import { Home } from './pages/Home'
 import { useI18n } from './i18n/useI18n'
 
@@ -54,12 +55,7 @@ function App() {
         <Home />
       </main>
 
-      <footer className="mx-auto mt-6 flex max-w-5xl flex-col gap-1 border-t border-(--line) py-6 text-xs text-(--fg-muted)">
-        <p>{t('notAffiliated')}</p>
-        <p>{t('dataCredit')}</p>
-        <p>{t('modelCredit')}</p>
-        <p>{t('satelliteCredit')}</p>
-      </footer>
+      <SpaceFooter />
     </>
   )
 }

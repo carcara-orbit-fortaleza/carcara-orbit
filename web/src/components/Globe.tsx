@@ -3,7 +3,6 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { isLandAt } from '../data/land'
 import { fetchRecentFires, type RecentFires } from '../data/hotspots'
-import { useI18n } from '../i18n/useI18n'
 
 // Raio da órbita do satélite, acima do halo atmosférico (1.12).
 const SATELLITE_RADIUS = 1.35
@@ -141,7 +140,6 @@ interface GlobeProps {
 
 export default function Globe({ animated, label }: GlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { t, formatNumber } = useI18n()
   // Checagem síncrona de WebGL, antes de montar o efeito.
   const [unsupported] = useState(() => !webglSupported())
   // undefined = carregando; null = sem dados reais (demonstração); objeto = focos reais.
@@ -264,7 +262,7 @@ export default function Globe({ animated, label }: GlobeProps) {
         model = loaded
       },
       undefined,
-      (error) => console.warn('Globo: modelo da Terra indisponível, usando planeta procedural.', error),
+      (error) => console.warn('Globe: Earth model unavailable, using procedural planet.', error),
     )
 
     // Órbita do satélite: fica na cena, e não no grupo do planeta, então não gira com a Terra.
@@ -295,7 +293,7 @@ export default function Globe({ animated, label }: GlobeProps) {
         satellite = holder
       },
       undefined,
-      (error) => console.warn('Globo: satélite indisponível.', error),
+      (error) => console.warn('Globe: satellite unavailable.', error),
     )
 
     const light = new THREE.DirectionalLight(0xffffff, 1.6)
@@ -345,7 +343,7 @@ export default function Globe({ animated, label }: GlobeProps) {
           render(time)
         } catch (error) {
           // Erro no quadro não derruba a página: para a animação e mantém o último quadro.
-          console.error('Globo: falha na animação', error)
+          console.error('Globe: animation failed', error)
           return
         }
         frame = requestAnimationFrame(loop)
@@ -369,20 +367,11 @@ export default function Globe({ animated, label }: GlobeProps) {
     }
   }, [animated, unsupported, fires])
 
-  // Sem WebGL, a abertura fica sem planeta (a legenda continua mostrando o estado).
+  // Sem WebGL, a abertura fica sem planeta.
   if (unsupported) return null
 
-  const caption =
-    fires === undefined
-      ? t('globeCaptionLoading')
-      : fires
-        ? t('globeCaptionReal', { shown: formatNumber(fires.points.length), total: formatNumber(fires.total) })
-        : t('globeCaptionDemo')
-
+  // Só o globo, sem legenda: ele é o destaque da abertura.
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} role="img" aria-label={label} className="h-full w-full overflow-hidden" />
-      <p className="absolute bottom-0 left-0 font-mono text-[11px] text-(--fg-muted)">{caption}</p>
-    </div>
+    <div ref={containerRef} role="img" aria-label={label} className="h-full w-full overflow-hidden" />
   )
 }

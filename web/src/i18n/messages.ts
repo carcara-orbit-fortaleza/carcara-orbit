@@ -1,4 +1,4 @@
-// Dicionários de tradução. O português é a referência: toda chave nova entra aqui primeiro.
+// Translation dictionaries. English is the site default and the reference: every new key goes into 'en' first.
 export const messages = {
   'pt-BR': {
     appName: 'Carcará Orbit',
@@ -13,13 +13,21 @@ export const messages = {
     navSolution: 'Solução',
     navMethod: 'Método',
     navStatus: 'Estado',
+    navDashboard: 'Abrir o painel',
 
-    globeLabel: 'Globo ilustrativo com focos de calor sobre o Brasil. Imagem decorativa.',
+    globeLabel: 'Globo 3D interativo com focos de calor sobre o Brasil e a órbita do satélite.',
     heroKicker: 'Calendário de atividade de queimadas',
     heroLead:
-      'Harmonizamos mais de duas décadas de focos de calor do MODIS e do VIIRS, da NASA, em uma série única e comparável. Assim, um gestor consegue ver em um minuto se este mês está fora do normal para a sua região.',
+      'Harmonizamos mais de duas décadas de focos de calor do MODIS e do VIIRS, da NASA, em uma série única e comparável.',
+    ctaDashboard: 'Abrir o painel',
     ctaSolution: 'Ver a solução',
     ctaMethod: 'Ver o método',
+
+    dashKicker: 'Painel interativo',
+    dashTitle: 'Veja a série harmonizada em ação',
+    dashLead:
+      'Calendário ano × mês, anomalia por mês, total anual e mapa dos focos por região. Os números usam a versão de demonstração do método.',
+    dashButton: 'Abrir o painel',
 
     problemTitle: 'Dois satélites, duas réguas',
     problemLead:
@@ -68,25 +76,23 @@ export const messages = {
 
     statusTitle: 'Onde estamos',
     statusLead:
-      'Protótipo funcional com dados sintéticos para demonstração. A ingestão do FIRMS real está em desenvolvimento.',
-    statusDone: 'Protótipo com calendário, anomalias e mapa, usando dados sintéticos.',
-    statusDoing: 'Ingestão FIRMS real e pipeline de harmonização.',
+      'O pipeline já ingere focos reais do FIRMS (MODIS e VIIRS NOAA-20/21) e alimenta o calendário e o mapa. A harmonização com calibração histórica ainda está em andamento.',
+    statusDone: 'FIRMS near-real-time ingestion, normalization and clustering, with the dashboard reading real data.',
+    statusDoing: 'Importação do histórico 2000–2025 e calibração dos fatores MODIS × VIIRS.',
     statusNext: 'Validação dos fatores com especialistas e testes com usuários.',
     statusNotOperational:
-      'Não use os números desta versão para decisão operacional.',
-
-    teamTitle: 'Equipe',
-    teamBody: 'Carcará Orbit: produto e dados, front-end, visualização e mapas, e fullstack e QA.',
+      'Os fatores de calibração ainda não foram estimados. Não use os números para decisão operacional.',
 
     mockNotice:
       'Dados sintéticos para demonstração. Não use para decisão operacional.',
     notAffiliated: 'Carcará Orbit não é oficial nem endossado pela NASA.',
-    dataCredit: 'Fonte prevista dos dados: NASA FIRMS (MODIS C6.1 e VIIRS).',
+    dataCredit: 'Fonte dos dados: NASA FIRMS (MODIS C6.1 e VIIRS 375 m).',
     modelCredit: 'Modelo 3D da Terra "Earth" por Akshat (Sketchfab), licença CC Attribution.',
     satelliteCredit: 'Modelo 3D do satélite "Simple Satellite Low Poly Free" por DjalalxJay (Sketchfab), CC BY 4.0.',
-    globeCaptionLoading: 'Carregando focos…',
-    globeCaptionReal: 'Focos reais FIRMS: {shown} na amostra de {total} no Brasil.',
-    globeCaptionDemo: 'Demonstração: focos sintéticos, API não conectada.',
+    skyboxCredit: 'Skybox "Alien Space Nebula 2" por Jungle Jim (Sketchfab), CC BY 4.0.',
+    astronautCredit: 'Modelo 3D do astronauta por Jungle Jim (Sketchfab), CC BY 4.0.',
+    spaceLabel: 'Cena espacial: nebulosa ao fundo e um astronauta que pode ser girado e acena ao clique.',
+    spaceHint: 'Arraste o astronauta para girar · clique nele para acenar',
 
     // Chaves usadas pelo calendário e pelo gráfico anual (para a tela de análise).
     regionLabel: 'Região',
@@ -121,13 +127,21 @@ export const messages = {
     navSolution: 'Solution',
     navMethod: 'Method',
     navStatus: 'Status',
+    navDashboard: 'Open the dashboard',
 
-    globeLabel: 'Illustrative globe with hotspots over Brazil. Decorative image.',
+    globeLabel: 'Interactive 3D globe with fire hotspots over Brazil and the satellite orbit.',
     heroKicker: 'Fire activity calendar',
     heroLead:
       'We harmonize more than two decades of NASA MODIS and VIIRS fire hotspots into one comparable series. In a minute, a manager can see whether this month is outside the normal range for their region.',
+    ctaDashboard: 'Open the dashboard',
     ctaSolution: 'See the solution',
     ctaMethod: 'See the method',
+
+    dashKicker: 'Interactive dashboard',
+    dashTitle: 'See the harmonized series in action',
+    dashLead:
+      'Year × month calendar, monthly anomaly, annual total and a hotspot map by region. The numbers use the demonstration version of the method.',
+    dashButton: 'Open the dashboard',
 
     problemTitle: 'Two satellites, two yardsticks',
     problemLead:
@@ -176,23 +190,22 @@ export const messages = {
 
     statusTitle: 'Where we are',
     statusLead:
-      'A working prototype with synthetic data for demonstration. The real FIRMS ingestion is in development.',
-    statusDone: 'Prototype with calendar, anomalies and map, using synthetic data.',
-    statusDoing: 'Real FIRMS ingestion and the harmonization pipeline.',
+      'The pipeline already ingests real FIRMS hotspots (MODIS and VIIRS NOAA-20/21) and feeds the calendar and map. Harmonization with historical calibration is still in progress.',
+    statusDone: 'FIRMS near-real-time ingestion, normalization and clustering, with the dashboard reading real data.',
+    statusDoing: 'Importing the 2000–2025 history and calibrating the MODIS × VIIRS factors.',
     statusNext: 'Expert validation of the factors and user testing.',
-    statusNotOperational: 'Do not use the numbers in this version for operational decisions.',
+    statusNotOperational: 'The calibration factors have not been estimated yet. Do not use the numbers for operational decisions.',
 
-    teamTitle: 'Team',
-    teamBody: 'Carcará Orbit: product and data, front-end, visualization and maps, and fullstack and QA.',
 
     mockNotice: 'Synthetic data for demonstration only. Do not use for operational decisions.',
     notAffiliated: 'Carcará Orbit is not an official product and is not endorsed by NASA.',
-    dataCredit: 'Planned data source: NASA FIRMS (MODIS C6.1 and VIIRS).',
+    dataCredit: 'Data source: NASA FIRMS (MODIS C6.1 and VIIRS 375 m).',
     modelCredit: '3D Earth model "Earth" by Akshat (Sketchfab), CC Attribution license.',
     satelliteCredit: '3D satellite model "Simple Satellite Low Poly Free" by DjalalxJay (Sketchfab), CC BY 4.0.',
-    globeCaptionLoading: 'Loading hotspots…',
-    globeCaptionReal: 'Real FIRMS hotspots: {shown} sampled out of {total} in Brazil.',
-    globeCaptionDemo: 'Demo: synthetic hotspots, API not connected.',
+    skyboxCredit: 'Skybox "Alien Space Nebula 2" by Jungle Jim (Sketchfab), CC BY 4.0.',
+    astronautCredit: '3D astronaut model by Jungle Jim (Sketchfab), CC BY 4.0.',
+    spaceLabel: 'Space scene: a nebula backdrop and an astronaut you can turn and who waves when clicked.',
+    spaceHint: 'Drag the astronaut to turn · click it to wave',
 
     regionLabel: 'Region',
     kpiYear: 'Hotspots in {year} (Jan–Oct)',

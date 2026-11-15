@@ -17,9 +17,10 @@ este monorepo passa a ser a fonte única de verdade.
 
 A infraestrutura segue o padrão do [Baseware](https://github.com/platusforge/baseware):
 três arquivos de Compose (base, override de desenvolvimento e override de produção),
-Postgres 16 em container com backup diário, Dockerfiles multi-stage e, em produção,
-Traefik + nginx servindo a SPA e fazendo proxy de `/api`. O CI/CD faz verificação,
-build das imagens e deploy por SSH na VPS.
+Postgres 16 em container com backup diário e Dockerfiles multi-stage. Em produção,
+o nginx serve a SPA e faz proxy de `/api`; o Traefik que já roda na VPS termina o
+TLS e roteia o subdomínio para o `web`. O CI/CD faz verificação, build das imagens
+e deploy por SSH na VPS.
 
 ## Como os dois se conectam
 
@@ -127,13 +128,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env 
 Antes de subir:
 
 - aponte o DNS de `APP_HOST` para o servidor;
-- defina `DB_PASSWORD`, `APP_HOST` e `ADMIN_EMAIL` no `.env`;
-- libere as portas `80` e `443`.
+- defina `DB_PASSWORD`, `APP_HOST` e `TRAEFIK_*` no `.env` (veja
+  [`docs/DEPLOY.md`](./docs/DEPLOY.md#proxy-reverso-traefik-da-vps));
+- conecte o `web` à rede do Traefik que já atende `80/443` na VPS.
 
-O Traefik termina o TLS e encaminha para o nginx do `web`. O nginx serve os assets
-da SPA e faz proxy de `/api` para o serviço `api`, que permanece inacessível
-diretamente pela internet. O Postgres não publica porta no host e roda com
-backup diário.
+O Traefik da VPS termina o TLS e encaminha para o nginx do `web` pela rede
+compartilhada. O nginx serve os assets da SPA e faz proxy de `/api` para o
+serviço `api`, que permanece inacessível diretamente pela internet. O Postgres
+não publica porta no host e roda com backup diário.
 
 ## CI/CD e deploy na VPS
 
@@ -143,8 +145,8 @@ O workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml):
 2. sobe um Postgres de serviço, aplica migrações e testa `/api/health`;
 3. valida os Compose e constrói as imagens Docker;
 4. com a variável `DEPLOY_ENABLED=true`, copia o repo para
-   `~/dev/carcara-orbit`, escreve o `.env` a partir dos secrets, sobe o Compose
-   de produção, confere a saúde e remove o `.env`.
+   `~/dev/carcara-orbit`, escreve o `.env` a partir dos secrets e das variáveis
+   `TRAEFIK_*`, sobe o Compose de produção, confere a saúde e remove o `.env`.
 
 Secrets e passos detalhados: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 

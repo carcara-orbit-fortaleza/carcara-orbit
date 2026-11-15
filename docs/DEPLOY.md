@@ -2,24 +2,35 @@
 
 O fluxo segue o padrão do [Baseware](https://github.com/platusforge/baseware):
 GitHub Actions valida o monorepo, copia os arquivos para a VPS por SCP, escreve
-o `.env` a partir dos secrets, sobe o Compose de produção e remove o `.env`.
+o `.env` a partir dos secrets e variáveis, sobe o Compose de produção e remove
+o `.env`.
+
+Este projeto **não sobe Traefik**. O Traefik que já atende `80/443` na VPS é o
+edge: o container `web` entra na rede dele e recebe as labels do subdomínio.
+Veja [Proxy reverso](#proxy-reverso-traefik-da-vps).
 
 ## Pré-requisitos da VPS
 
 - Docker Engine + Compose v2.
-- Portas `80` e `443` liberadas (Traefik/Let's Encrypt).
+- Traefik já rodando em `80/443`, com ACME/Let's Encrypt configurado.
 - DNS de `APP_HOST` apontando para o IP da VPS.
 - Usuário com acesso ao Docker (ou `sudo` configurado para o usuário do deploy).
 - Diretório de deploy: `~/dev/carcara-orbit`.
 
-## Variável do repositório
+## Variáveis do repositório
 
-Crie a variável **`DEPLOY_ENABLED`** com valor `true` em
-`Settings → Secrets and variables → Actions → Variables`.
+Crie em `Settings → Secrets and variables → Actions → Variables`:
 
-Sem ela, o job `deploy` é ignorado e apenas o `verify` roda. Isso evita deploys
-acidentais antes dos secrets estarem configurados. Para desativar o deploy,
-basta remover a variável.
+| Variável | Padrão | Uso |
+| --- | --- | --- |
+| `DEPLOY_ENABLED` | — | `true` liga o job `deploy`; sem ela só o `verify` roda |
+| `TRAEFIK_NETWORK` | `traefik-proxy` | rede Docker do Traefik da VPS |
+| `TRAEFIK_ENTRYPOINT` | `websecure` | entrypoint de TLS do Traefik |
+| `TRAEFIK_CERT_RESOLVER` | `le` | certresolver ACME do Traefik |
+
+Sem `DEPLOY_ENABLED=true`, o job `deploy` é ignorado e apenas o `verify` roda.
+Isso evita deploys acidentais antes dos secrets estarem configurados. Para
+desativar o deploy, basta remover a variável.
 
 ## Secrets obrigatórios
 
@@ -32,8 +43,10 @@ basta remover a variável.
 | `DB_USER` | `carcara` |
 | `DB_PASSWORD` | senha forte; obrigatória |
 | `DB_NAME` | `carcara` |
-| `APP_HOST` | domínio público, ex. `orbit.exemplo.org` |
-| `ADMIN_EMAIL` | e-mail para o Let's Encrypt |
+| `APP_HOST` | subdomínio público, ex. `orbit.exemplo.org` |
+
+> `ADMIN_EMAIL` não é mais usado por este projeto: o certificado é emitido pelo
+> Traefik que já roda na VPS.
 
 ### Secrets opcionais
 
@@ -62,6 +75,84 @@ basta remover a variável.
 > `DATABASE_URL` não precisa ser configurada: o Compose passa `DB_*` e a API
 > monta a URL com as credenciais percent-encoded.
 
+> `API_PORT` é a porta **interna** da rede do Compose. Em produção ela não é
+> publicada no host, então não conflita com nenhum outro serviço que já use
+> `3000` na VPS. Apenas o modo desenvolvimento (`docker-compose.override.yml`)
+> publica `API_PORT`, `WEB_PORT` e `DB_PORT` no host.
+
+## Proxy reverso (Traefik da VPS)
+
+O `docker-compose.prod.yml` não publica `80/443` e não cria Traefik. O serviço
+`web` é conectado à rede do Traefik existente (`TRAEFIK_NETWORK`) e recebe estas
+labels:
+
+- `traefik.enable=true`
+- `traefik.docker.network=$TRAEFIK_NETWORK`
+- `traefik.http.routers.carcara-orbit.rule=Host($APP_HOST)`
+- `traefik.http.routers.carcara-orbit.entrypoints=$TRAEFIK_ENTRYPOINT`
+- `traefik.http.routers.carcara-orbit.tls.certresolver=$TRAEFIK_CERT_RESOLVER`
+- `traefik.http.services.carcara-orbit.loadbalancer.server.port=80`
+
+Descubra os valores na VPS:
+
+```bash
+TRAEFIK=$(docker ps --format '{{.Names}}' | grep -i traefik | head -n1)
+
+# modo de rede: "host" exige o fallback abaixo; "bridge" (padrão) usa a rede
+docker inspect "$TRAEFIK" --format '{{.HostConfig.NetworkMode}}'
+
+# rede(s) do Traefik — use o nome exato em TRAEFIK_NETWORK
+docker inspect "$TRAEFIK" \
+  --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+
+# entrypoints e certresolver
+docker inspect "$TRAEFIK" --format '{{json .Args}}' | tr ',' '\n' \
+  | grep -E 'entrypoints|certresolver|providers.docker'
+```
+
+- **Rede:** o nome exato em `docker network ls` (ex. `traefik`, `proxy`,
+  `traefik_default`). É o valor de `TRAEFIK_NETWORK`. Ignore `bridge`/`host`:
+  use a rede user-defined que o Traefik compartilha com os serviços.
+- **Entrypoint:** o que aponta para `:443` (normalmente `websecure`).
+- **Certresolver:** o `<nome>` de
+  `--certificatesresolvers.<nome>.acme...` (ex. `le`, `letsencrypt`).
+
+> Se o Traefik usa arquivo de configuração em vez de flags, os mesmos nomes
+> estão no `traefik.yml`/`traefik.toml` do container ou no dashboard.
+
+Um Traefik típico em container usa `providers.docker.exposedbydefault=false`, o
+que combina com as labels acima. A API e o Postgres têm `traefik.enable=false`
+para nunca serem roteados, mesmo que o Traefik exponha containers por padrão.
+
+Se a rede ainda não existir, crie e conecte o Traefik:
+
+```bash
+docker network create traefik-proxy
+docker network connect traefik-proxy "$TRAEFIK"
+```
+
+> Traefik em `network_mode: host` não alcança containers por nome. Nesse caso,
+> publique o `web` em `127.0.0.1:8080` (override com
+> `ports: ["127.0.0.1:8080:80"]`) e crie um router no file provider apontando
+> para `http://127.0.0.1:8080`.
+
+Depois do deploy, valide o caminho público:
+
+```bash
+curl -I "https://$APP_HOST"
+curl -fsS "https://$APP_HOST/api/health"
+```
+
+### Troubleshooting do proxy
+
+| Sintoma | Causa provável |
+| --- | --- |
+| `network ... declared as external, but could not be found` | `TRAEFIK_NETWORK` errado; ajuste a variável ou crie a rede |
+| 404 do Traefik | `web` fora da rede, `traefik.enable=true` ausente ou provider Docker do Traefik desabilitado |
+| 404 e `web` não aparece no dashboard do Traefik | `providers.docker.constraints` do Traefik exclui o container |
+| `certificate resolver ... does not exist` / TLS inválido | `TRAEFIK_CERT_RESOLVER` não corresponde ao ACME do Traefik |
+| 502 Bad Gateway | `web` unhealthy ou `traefik.http.services...server.port` diferente de `80` |
+
 ## O que o workflow faz
 
 1. **verify** (push/PR na `main`):
@@ -73,8 +164,8 @@ basta remover a variável.
    - constrói as imagens Docker de API e web.
 2. **deploy** (push na `main`, se `DEPLOY_ENABLED=true`):
    - copia o repositório para `~/dev/carcara-orbit`;
-   - escreve `.env` a partir dos secrets;
-   - executa `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --force-recreate --remove-orphans`;
+   - escreve `.env` a partir dos secrets e das variáveis `TRAEFIK_*`;
+   - executa `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --force-recreate --remove-orphans` (sem publicar `80/443`);
    - reaplica as migrações (idempotente);
    - falha se `/api/health` não estiver `ok` com Postgres conectado;
    - remove o `.env` ao final (mesmo em caso de erro).
@@ -84,7 +175,7 @@ basta remover a variável.
 ```bash
 cd ~/dev/carcara-orbit
 cp .env.example .env
-# edite DB_*, APP_HOST, ADMIN_EMAIL e demais variáveis
+# edite DB_*, APP_HOST, TRAEFIK_* e demais variáveis
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   --env-file .env up -d --build --force-recreate --remove-orphans
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \

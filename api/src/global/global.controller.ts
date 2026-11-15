@@ -41,6 +41,15 @@ export class GlobalController {
     return this.global.listRegions({ bbox, limit });
   }
 
+  /**
+   * Compact harmonized calendar aggregate: every grid cell with monthly
+   * MODIS/VIIRS/harmonized counts and calibration factors.
+   */
+  @Get('aggregates')
+  aggregates() {
+    return this.global.aggregates();
+  }
+
   /** Grid cells as GeoJSON polygons. */
   @Get('regions.geojson')
   regionsGeoJson(

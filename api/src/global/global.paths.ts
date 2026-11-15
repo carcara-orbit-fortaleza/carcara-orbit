@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 export interface GlobalPaths {
   databaseFile: string;
+  aggregatesFile: string;
   rawDir: string;
   regionsFile: string;
   calibrationFile: string;
@@ -19,6 +20,8 @@ export function globalPaths(env: NodeJS.ProcessEnv = process.env): GlobalPaths {
   const dataDir = join(process.cwd(), 'data');
   return {
     databaseFile: env.GLOBAL_DB_PATH ?? join(dataDir, 'db', 'global.sqlite'),
+    aggregatesFile:
+      env.AGGREGATES_DB_PATH ?? join(dataDir, 'db', 'aggregates.sqlite'),
     rawDir: env.GLOBAL_RAW_DIR ?? join(dataDir, 'raw', 'global'),
     regionsFile:
       env.GLOBAL_REGIONS_FILE ?? join(dataDir, 'runtime', 'global-regions.json'),

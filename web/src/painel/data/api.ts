@@ -3,15 +3,17 @@ import type { MessageKey } from '../../i18n/messages'
 import type { DatasetMeta, Hotspot, RegionMetrics, RegionSeries, Workspace } from '../types'
 import type { ExplainAskRequest, ExplainAskResponse } from '../explain/types'
 
-// Cliente do painel para a trilha global da API (`/api/global/*`).
-// Converte o contrato snake_case da grade global para o formato do painel.
+// Cliente do painel para a camada agregada global (`/api/global/aggregates`).
+// A API devolve, para cada célula, as matrizes anuais/mensais harmonizadas,
+// MODIS e VIIRS, além dos fatores de calibração. O painel carrega as células
+// mais ativas em uma requisição e calcula o calendário de qualquer AOI.
 
 type Matrix = (number | null)[][]
 
 // Em desenvolvimento a API roda na porta 3000. Em produção, defina VITE_API_URL.
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
-// Células exibidas no painel. O endpoint devolve as mais ativas primeiro.
+// Células exibidas no painel. A API devolve as mais ativas primeiro.
 const GLOBAL_REGION_LIMIT = 24
 
 /** Erro da API. Guarda uma chave de tradução, não texto pronto: a tela traduz no idioma atual. */
@@ -27,58 +29,43 @@ export class ApiError extends Error {
   }
 }
 
-type ApiGlobalRegion = {
+type ApiAggregateCell = {
   id: string
   name: string
-  biome?: string
-  color?: string
-  polygon?: [number, number][]
-  center?: [number, number]
-  hotspots?: number
-  first_year?: number
-  last_year?: number
-}
-
-type ApiGlobalRegions = {
-  scope?: string
-  gridDegrees?: number | null
-  total?: number
-  returned?: number
-  regions: ApiGlobalRegion[]
-}
-
-type ApiGlobalCalendar = {
-  mode?: string
-  region: ApiGlobalRegion | null
-  months: string[]
-  years: number[]
+  short?: string | null
+  biome?: string | null
+  scope?: string | null
+  areaKm2?: number | null
+  center?: [number, number] | null
+  color?: string | null
+  polygon?: [number, number][] | null
+  bounds?: [number, number, number, number] | null
+  hotspots: number
+  firstYear?: number | null
+  lastYear?: number | null
   counts: Matrix
-  raw_modis: Matrix
-  raw_viirs: Matrix
-  series: {
-    annual: {
-      year: number
-      total: number | null
-      partial: boolean
-      anomaly_pct: number | null
-    }[]
-  }
-  metrics: {
-    current_year?: number
-    current_year_total?: number | null
-    current_year_anomaly_pct?: number | null
-    peak_year?: number | null
-    peak_year_total?: number | null
-    baseline_mean_annual?: number | null
-    modis_total?: number | null
-    viirs_total?: number | null
-  }
-  meta?: {
-    disclaimer?: string
-    method_version?: string
-    baseline_years?: [number, number]
-    grid_degrees?: number | null
-  }
+  modis: Matrix
+  viirs: Matrix
+  factors?: number[]
+  calibration?: { factor: number; confidence: string }[]
+}
+
+type ApiAggregates = {
+  scope?: string
+  gridDegrees?: number
+  years: number[]
+  months: string[]
+  methodVersion?: string
+  datasetVersion?: string
+  calibrationWindow?: string | null
+  baselineFrom?: number
+  baselineTo?: number
+  currentYear?: number
+  lastCompleteYear?: number | null
+  warnings?: string[]
+  disclaimer?: string
+  source?: string
+  cells: ApiAggregateCell[]
 }
 
 type ApiGlobalHotspotFile = {
@@ -177,106 +164,171 @@ function trendPctDecade(points: { year: number; total: number | null }[]): numbe
   return ((numerator / denominator) * 10 / meanY) * 100
 }
 
-function regionSeriesFrom(region: ApiGlobalRegion, calendar: ApiGlobalCalendar, meta: DatasetMeta): RegionSeries {
-  const annual = calendar.series.annual.map((point) => ({
-    year: point.year,
-    total: finite(point.total),
-    partial: Boolean(point.partial),
-    anomaly: finite(point.anomaly_pct),
-  }))
-  const climatology = climatologyFrom(calendar.counts, calendar.months, calendar.years, meta.baselineFrom, meta.baselineTo)
-  const peak = climatology.reduce<(typeof climatology)[number] | null>(
-    (best, month) => (month.mean !== null && (best === null || month.mean > (best.mean ?? -Infinity)) ? month : best),
+function mean(values: number[]): number | null {
+  if (values.length === 0) return null
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function sumMatrix(matrix: Matrix): number {
+  return matrix.reduce(
+    (sum, row) => sum + row.reduce<number>((rowSum, value) => rowSum + (value ?? 0), 0),
+    0,
+  )
+}
+
+function regionSeriesFrom(
+  cell: ApiAggregateCell,
+  years: number[],
+  months: string[],
+  meta: DatasetMeta,
+): RegionSeries {
+  const counts = cell.counts
+  const rawModis = cell.modis
+  const rawViirs = cell.viirs
+
+  const annual = years.map((year, index) => {
+    const row = counts[index] ?? []
+    const known = row.filter((value): value is number => typeof value === 'number')
+    const total = known.length ? known.reduce((sum, value) => sum + value, 0) : null
+    return {
+      year,
+      total,
+      partial: known.length > 0 && known.length < 12,
+      anomaly: null as number | null,
+    }
+  })
+
+  const baselineTotals = annual
+    .filter(
+      (point) =>
+        point.year >= meta.baselineFrom &&
+        point.year <= meta.baselineTo &&
+        point.total !== null &&
+        !point.partial,
+    )
+    .map((point) => point.total as number)
+  const baselineMean = mean(baselineTotals)
+
+  for (const point of annual) {
+    point.anomaly =
+      point.total !== null && baselineMean !== null && baselineMean > 0
+        ? ((point.total - baselineMean) / baselineMean) * 100
+        : null
+  }
+
+  const current = annual.find((point) => point.year === meta.currentYear) ?? null
+  const withData = annual.filter(
+    (point): point is { year: number; total: number; partial: boolean; anomaly: number | null } =>
+      point.total !== null,
+  )
+  const peak = withData.reduce<{ year: number; total: number } | null>(
+    (best, point) => (best === null || point.total > best.total ? point : best),
     null,
   )
-  const modisRaw = calendar.metrics.modis_total ?? 0
-  const viirsRaw = calendar.metrics.viirs_total ?? 0
+
+  const modisRaw = sumMatrix(rawModis)
+  const viirsRaw = sumMatrix(rawViirs)
   const rawTotal = modisRaw + viirsRaw
 
   const metrics: RegionMetrics = {
-    biome: region.biome ?? 'Grade global',
-    currentYearTotal: finite(calendar.metrics.current_year_total),
-    currentYearAnomaly: finite(calendar.metrics.current_year_anomaly_pct),
-    peakYear: finite(calendar.metrics.peak_year),
-    peakYearTotal: finite(calendar.metrics.peak_year_total),
+    biome: cell.biome ?? 'Grade global',
+    currentYearTotal: current?.total ?? null,
+    currentYearAnomaly: current?.anomaly ?? null,
+    peakYear: peak?.year ?? null,
+    peakYearTotal: peak?.total ?? null,
     trendPctDecade: trendPctDecade(annual),
     trendWindow: `${meta.baselineFrom}–${meta.baselineTo}`,
     modisPct: rawTotal > 0 ? (modisRaw / rawTotal) * 100 : 0,
     viirsPct: rawTotal > 0 ? (viirsRaw / rawTotal) * 100 : 0,
     modisRaw,
     viirsRaw,
-    // A API global aplica o fator por célula/mês ao montar `counts`.
+    // A API aplica o fator por célula/mês ao montar as contagens harmonizadas.
     factor: 1,
     uncertaintyPct: null,
     confidence: 'global',
-    baselineMeanAnnual: finite(calendar.metrics.baseline_mean_annual),
+    baselineMeanAnnual: baselineMean,
   }
 
+  const climatology = climatologyFrom(
+    counts,
+    months,
+    years,
+    meta.baselineFrom,
+    meta.baselineTo,
+  )
+  const peakMonth = climatology.reduce<(typeof climatology)[number] | null>(
+    (best, month) =>
+      month.mean !== null && (best === null || month.mean > (best.mean ?? -Infinity))
+        ? month
+        : best,
+    null,
+  )
+
   return {
-    id: region.id,
-    name: region.name,
-    color: region.color ?? '#4E79A7',
-    ring: region.polygon ?? [],
-    counts: calendar.counts,
-    rawModis: calendar.raw_modis,
-    rawViirs: calendar.raw_viirs,
+    id: cell.id,
+    name: cell.name,
+    color: cell.color ?? '#4E79A7',
+    ring: cell.polygon ?? [],
+    counts,
+    rawModis,
+    rawViirs,
     // Sem texto gerado no cliente: o painel monta as leituras na língua atual.
     insights: [],
     metrics,
     climatology,
     annual,
-    peakMonthLabel: peak && peak.mean !== null && peak.mean > 0 ? peak.label : '—',
+    peakMonthLabel: peakMonth && peakMonth.mean !== null && peakMonth.mean > 0 ? peakMonth.label : '—',
   }
 }
 
-/** Metadados do dataset global, derivados da calibração servida junto com o calendário. */
-function globalDatasetMeta(calendar: ApiGlobalCalendar): DatasetMeta {
-  const baseline = calendar.meta?.baseline_years ?? [2003, 2025]
-  const years = calendar.years ?? []
+/** Metadados do dataset global, derivados do agregado servido pela API. */
+function aggregateMeta(aggregate: ApiAggregates): DatasetMeta {
+  const years = aggregate.years ?? []
+  const currentYear =
+    typeof aggregate.currentYear === 'number'
+      ? aggregate.currentYear
+      : years.length
+        ? Math.max(...years)
+        : new Date().getFullYear()
   return {
     mode: 'real',
-    methodVersion: calendar.meta?.method_version ?? 'h1.0',
-    datasetVersion: calendar.meta?.method_version ?? '',
-    currentYear: years.length ? Math.max(...years) : new Date().getFullYear(),
-    baselineFrom: baseline[0],
-    baselineTo: baseline[1],
-    calibrationWindow: `${baseline[0]}–${baseline[1]}`,
-    periodStart: null,
-    periodEnd: null,
-    lastCompleteYear: null,
-    warnings: [],
+    methodVersion: aggregate.methodVersion ?? 'h1.0',
+    datasetVersion: aggregate.datasetVersion ?? aggregate.methodVersion ?? '',
+    currentYear,
+    baselineFrom: aggregate.baselineFrom ?? 2003,
+    baselineTo: aggregate.baselineTo ?? 2025,
+    calibrationWindow: aggregate.calibrationWindow ?? '',
+    periodStart: years.length ? String(years[0]) : null,
+    periodEnd: years.length ? String(years[years.length - 1]) : null,
+    lastCompleteYear:
+      aggregate.lastCompleteYear ?? (years.length ? Math.max(...years) : null),
+    warnings: aggregate.warnings ?? [],
   }
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
   await getJson<{ status: string }>('/health')
-  const response = await getJson<ApiGlobalRegions>(`/global/regions?limit=${GLOBAL_REGION_LIMIT}`)
-  const regions = response.regions ?? []
-  if (regions.length === 0) throw new ApiError(404, 'panelErrNoGrid')
+  const aggregate = await getJson<ApiAggregates>('/global/aggregates')
+  const cells = aggregate.cells ?? []
+  if (cells.length === 0) throw new ApiError(404, 'panelErrNoGrid')
 
-  // Se a ingestão estiver escrevendo no SQLite, alguma célula pode falhar.
-  const to = new Date().getFullYear()
-  const calendars = await Promise.all(
-    regions.map((region) =>
-      getJson<ApiGlobalCalendar>(`/global/calendar?region=${encodeURIComponent(region.id)}&from=2000&to=${to}`).catch(
-        () => null,
-      ),
-    ),
-  )
-  const pairs = regions
-    .map((region, index) => ({ region, calendar: calendars[index] }))
-    .filter((pair): pair is { region: ApiGlobalRegion; calendar: ApiGlobalCalendar } => pair.calendar !== null)
-  const first = pairs[0]
-  if (!first) throw new ApiError(404, 'panelErrNoCalendars')
+  const years = aggregate.years ?? []
+  const months = aggregate.months ?? []
+  if (years.length === 0 || months.length === 0) throw new ApiError(404, 'panelErrNoCalendars')
 
-  const meta = globalDatasetMeta(first.calendar)
+  const meta = aggregateMeta(aggregate)
+  // O painel/navegação usa as células mais ativas; a API mantém todas as
+  // células no agregado para consultas por AOI/exportação.
+  const regions = cells
+    .slice(0, GLOBAL_REGION_LIMIT)
+    .map((cell) => regionSeriesFrom(cell, years, months, meta))
+
   return {
-    years: first.calendar.years,
-    months: first.calendar.months,
-    // Texto vindo da API (vazio se ausente). A tela cai na versão traduzida em panelDisclaimerFallback.
-    disclaimer: first.calendar.meta?.disclaimer ?? '',
+    years,
+    months,
+    disclaimer: aggregate.disclaimer ?? '',
     hotspots: [],
-    regions: pairs.map((pair) => regionSeriesFrom(pair.region, pair.calendar, meta)),
+    regions,
     meta,
   }
 }

@@ -138,6 +138,71 @@ interface HotspotRow {
   resolution_m: number | null;
 }
 
+interface AggregateCellRow {
+  id: string;
+  name: string;
+  short: string | null;
+  biome: string | null;
+  scope: string | null;
+  area_km2: number | null;
+  center: string | null;
+  color: string | null;
+  polygon: string | null;
+  bounds: string | null;
+}
+
+interface AggregateCalendarRow {
+  cell_id: string;
+  year: number;
+  month: number;
+  modis: number;
+  viirs: number;
+  hotspots: number;
+  factor: number;
+  harmonized: number;
+}
+
+interface AggregateCalibrationRow {
+  cell_id: string;
+  month: number;
+  factor: number;
+  confidence: string;
+}
+
+interface AggregatePointRow {
+  id: string;
+  cell_id: string;
+  lat: number;
+  lon: number;
+  date: string;
+  ts_ms: number;
+  year: number;
+  month: number;
+  sensor: string;
+  platform: string | null;
+  instrument: string | null;
+  resolution_m: number | null;
+  confidence: number | null;
+  confidence_class: string | null;
+  brightness_k: number | null;
+  frp_mw: number | null;
+  daynight: string | null;
+  qa_flag: string | null;
+  source: string | null;
+  method_version: string | null;
+  region_name: string | null;
+  region_biome: string | null;
+}
+
+function parseJson<T>(value: string | null): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
 function numberOr(value: unknown, fallback = 0): number {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -199,6 +264,136 @@ export class GlobalService {
         : { available: false },
       ingestion,
     };
+  }
+
+  /**
+   * Compact harmonized calendar aggregate: every grid cell with monthly
+   * MODIS/VIIRS/harmonized counts and calibration factors.
+   */
+  aggregates() {
+    const path = this.paths.aggregatesFile;
+    if (!existsSync(path)) {
+      throw new ServiceUnavailableException(
+        'O agregado global ainda não foi gerado. Rode o job de agregação (DuckDB).',
+      );
+    }
+    let db: DatabaseSync | null = null;
+    try {
+      db = new DatabaseSync(path, { readOnly: true });
+      db.exec('PRAGMA busy_timeout = 5000;');
+      const metaRows = db
+        .prepare('SELECT key, value FROM meta')
+        .all() as Array<{ key: string; value: string }>;
+      const meta = Object.fromEntries(metaRows.map((row) => [row.key, row.value]));
+      const yearsMin = Number(meta.years_min ?? 2000);
+      const yearsMax = Number(meta.years_max ?? 2025);
+      const years = Array.from(
+        { length: Math.max(0, yearsMax - yearsMin + 1) },
+        (_, index) => yearsMin + index,
+      );
+      const cellRows = db
+        .prepare('SELECT * FROM cells')
+        .all() as unknown as AggregateCellRow[];
+      const monthRows = db
+        .prepare(
+          `SELECT cell_id, year, month, modis, viirs, hotspots, factor, harmonized
+           FROM cell_month`,
+        )
+        .all() as unknown as AggregateCalendarRow[];
+      const calibrationRows = db
+        .prepare(
+          'SELECT cell_id, month, factor, confidence FROM calibration',
+        )
+        .all() as unknown as AggregateCalibrationRow[];
+
+      const makeMatrix = (): (number | null)[][] =>
+        years.map(() => Array.from({ length: 12 }, () => null));
+
+      const cells = cellRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        short: row.short,
+        biome: row.biome,
+        scope: row.scope,
+        areaKm2: row.area_km2,
+        center: parseJson<[number, number]>(row.center),
+        color: row.color,
+        polygon: parseJson<[number, number][]>(row.polygon),
+        bounds: parseJson<[number, number, number, number]>(row.bounds),
+        hotspots: 0,
+        firstYear: null as number | null,
+        lastYear: null as number | null,
+        counts: makeMatrix(),
+        modis: makeMatrix(),
+        viirs: makeMatrix(),
+        factors: Array.from({ length: 12 }, () => 1),
+        calibration: Array.from({ length: 12 }, () => ({
+          factor: 1,
+          confidence: 'low',
+        })),
+      }));
+      const cellMap = new Map(cells.map((cell) => [cell.id, cell]));
+
+      for (const row of monthRows) {
+        const cell = cellMap.get(row.cell_id);
+        if (!cell) continue;
+        const yearIndex = row.year - yearsMin;
+        const monthIndex = row.month - 1;
+        if (
+          yearIndex < 0 ||
+          yearIndex >= years.length ||
+          monthIndex < 0 ||
+          monthIndex >= 12
+        ) {
+          continue;
+        }
+        cell.counts[yearIndex][monthIndex] = Number(row.harmonized) || 0;
+        cell.modis[yearIndex][monthIndex] = Number(row.modis) || 0;
+        cell.viirs[yearIndex][monthIndex] = Number(row.viirs) || 0;
+        cell.factors[monthIndex] = Number(row.factor) || 1;
+        cell.hotspots += Number(row.hotspots) || 0;
+        cell.firstYear =
+          cell.firstYear === null ? row.year : Math.min(cell.firstYear, row.year);
+        cell.lastYear =
+          cell.lastYear === null ? row.year : Math.max(cell.lastYear, row.year);
+      }
+
+      for (const row of calibrationRows) {
+        const cell = cellMap.get(row.cell_id);
+        if (!cell) continue;
+        const monthIndex = row.month - 1;
+        if (monthIndex < 0 || monthIndex >= 12) continue;
+        cell.calibration[monthIndex] = {
+          factor: Number(row.factor) || 1,
+          confidence: row.confidence || 'low',
+        };
+      }
+
+      cells.sort(
+        (a, b) => b.hotspots - a.hotspots || a.name.localeCompare(b.name),
+      );
+
+      return {
+        scope: 'global',
+        gridDegrees: Number(meta.grid_degrees ?? 10),
+        years,
+        months: MONTHS,
+        methodVersion: meta.method_version ?? 'h1.0',
+        calibrationWindow: meta.calibration_window ?? null,
+        disclaimer:
+          meta.disclaimer ??
+          'Contagens globais derivadas de focos ativos NASA FIRMS/Earthdata. Uso informativo; não substitui validação oficial.',
+        source: meta.source ?? 'NASA FIRMS / Earthdata',
+        cells,
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException(
+        `Falha ao ler o agregado global: ${errorMessage(error)}`,
+      );
+    } finally {
+      db?.close();
+    }
   }
 
   /** Grid cells that have global hotspots, optionally filtered by bbox. */
@@ -483,6 +678,9 @@ export class GlobalService {
     sensor?: string;
     limit?: string;
   }) {
+    if (existsSync(this.paths.aggregatesFile)) {
+      return this.hotspotsFromAggregates(params);
+    }
     const area = this.resolveArea(params);
     const period = parseYearRange(params.from, params.to);
     const sensor = parseSensor(params.sensor);
@@ -710,6 +908,109 @@ export class GlobalService {
       filename: `carcara-orbit_global_focos${suffix ? `_${suffix}` : ''}.csv`,
       body: `${BOM}${lines.join('\r\n')}\r\n`,
     };
+  }
+
+  private hotspotsFromAggregates(params: {
+    region?: string;
+    bbox?: string;
+    from?: string;
+    to?: string;
+    sensor?: string;
+    limit?: string;
+  }) {
+    const range = parseYearRange(params.from, params.to);
+    const bbox = parseBbox(params.bbox);
+    const sensor = parseSensor(params.sensor);
+    const limit =
+      params.limit === undefined ? HOTSPOT_LIMIT : Number(params.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > HOTSPOT_MAX_LIMIT) {
+      throw new BadRequestException(
+        `limit deve ser um inteiro entre 1 e ${HOTSPOT_MAX_LIMIT}`,
+      );
+    }
+    const where: string[] = ['r.year >= ?', 'r.year <= ?'];
+    const values: Array<string | number> = [range.from, range.to];
+    if (params.region) {
+      where.push('r.cell_id = ?');
+      values.push(params.region);
+    }
+    if (sensor) {
+      where.push('r.sensor = ?');
+      values.push(sensor);
+    }
+    if (bbox) {
+      where.push('r.lon >= ?', 'r.lon <= ?', 'r.lat >= ?', 'r.lat <= ?');
+      values.push(bbox[0], bbox[2], bbox[1], bbox[3]);
+    }
+    const clause = where.join(' AND ');
+    let db: DatabaseSync | null = null;
+    try {
+      db = new DatabaseSync(this.paths.aggregatesFile, { readOnly: true });
+      db.exec('PRAGMA busy_timeout = 5000;');
+      const total = Number(
+        (
+          db
+            .prepare(
+              `SELECT COUNT(*) AS count FROM recent_points r WHERE ${clause}`,
+            )
+            .get(...values) as { count: number }
+        ).count,
+      );
+      const rows = db
+        .prepare(
+          `SELECT r.*, c.name AS region_name, c.biome AS region_biome
+           FROM recent_points r
+           LEFT JOIN cells c ON c.id = r.cell_id
+           WHERE ${clause}
+           ORDER BY r.ts_ms DESC
+           LIMIT ?`,
+        )
+        .all(...values, limit) as unknown as AggregatePointRow[];
+      const features = rows.map((row) => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [row.lon, row.lat],
+        },
+        properties: {
+          id: row.id,
+          date: row.date,
+          ts_utc: new Date(row.ts_ms).toISOString(),
+          region_id: row.cell_id,
+          region_name: row.region_name,
+          biome: row.region_biome ?? 'Grade global',
+          sensor: row.sensor,
+          sensors: [row.sensor],
+          platform: row.platform,
+          platforms: row.platform ? [row.platform] : [],
+          instrument: row.instrument,
+          resolution_m: row.resolution_m,
+          confidence: row.confidence,
+          confidence_class: row.confidence_class,
+          brightness_k: row.brightness_k,
+          frp_mw: row.frp_mw,
+          daynight: row.daynight,
+          qa_flag: row.qa_flag,
+          harmonized_weight: 1,
+          hotspot_count: 1,
+          method_version: row.method_version ?? 'h1.0',
+        },
+      }));
+      return {
+        mode: 'global' as const,
+        type: 'FeatureCollection' as const,
+        total,
+        returned: features.length,
+        features,
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException(
+        `Falha ao ler os focos recentes do agregado: ${errorMessage(error)}`,
+      );
+    } finally {
+      db?.close();
+    }
   }
 
   private resolveArea(params: { region?: string; bbox?: string }) {

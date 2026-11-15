@@ -238,7 +238,7 @@ export default function Globe({ animated, label }: GlobeProps) {
     let cancelled = false
     let model: THREE.Object3D | null = null
     new GLTFLoader().load(
-      `${import.meta.env.BASE_URL}models/earth-4k.glb`,
+      `${import.meta.env.BASE_URL}models/earth-2k.glb`,
       (gltf) => {
         if (cancelled) {
           disposeTree(gltf.scene)

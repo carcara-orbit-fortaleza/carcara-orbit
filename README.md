@@ -30,6 +30,11 @@ e deploy por SSH na VPS.
 - **Produção:** o front é compilado com `VITE_API_URL=/api`, então todas as chamadas
   são relativas e passam pelo nginx do serviço `web`, que encaminha `/api/*` para
   `api:3000` na rede interna do Docker. A API **não** é publicada no host.
+- **Dados:** o globo da home e o painel consomem a trilha global
+  (`/api/global/hotspots`, `/api/global/regions`, `/api/global/calendar`), cujo
+  SQLite vive em `data/db/global.sqlite`. Os endpoints `/api/hotspots`,
+  `/api/regions` e `/api/calendar` continuam disponíveis para a trilha Brasil
+  legada, controlada por `DATA_SOURCE`.
 - Os cookies de sessão do painel funcionam nos dois modos (CORS com credenciais em dev,
   mesma origem em produção).
 
@@ -53,8 +58,16 @@ docker compose up --build
 | Postgres | `localhost:5432` (somente dev) |
 
 O Compose de desenvolvimento usa bind mount e hot reload nos dois serviços. O
-entrypoint da API aplica as migrações do Postgres automaticamente. Por padrão a
-API sobe em `DATA_SOURCE=mock`, com os dados de `api/data/mock`.
+entrypoint da API aplica as migrações do Postgres automaticamente. O globo e o
+painel usam a trilha global; para popular o SQLite no dev, rode um piloto:
+
+```bash
+docker compose exec -T api npm run global -- --countries all --max-files 20 --grid 10
+```
+
+Sem esse piloto, o globo mantém a demonstração e o painel informa que a grade
+global ainda não tem dados. `DATA_SOURCE=mock` afeta apenas os endpoints
+legados do Brasil.
 
 ### Postgres
 
@@ -136,6 +149,11 @@ O Traefik da VPS termina o TLS e encaminha para o nginx do `web` pela rede
 compartilhada. O nginx serve os assets da SPA e faz proxy de `/api` para o
 serviço `api`, que permanece inacessível diretamente pela internet. O Postgres
 não publica porta no host e roda com backup diário.
+
+Os dados do globo e do painel vêm da trilha global (`data/db/global.sqlite`),
+carregada com `npm run global` e persistida no volume `api_data`. O runbook
+está em [`docs/DEPLOY.md`](./docs/DEPLOY.md#dados-analíticos-na-vps) e
+[`docs/GLOBAL.md`](./docs/GLOBAL.md).
 
 ## CI/CD e deploy na VPS
 

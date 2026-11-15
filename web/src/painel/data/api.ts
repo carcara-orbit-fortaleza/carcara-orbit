@@ -1,12 +1,15 @@
-import type { Hotspot, RegionSeries, Workspace } from '../types'
+import type { Hotspot, RegionMetrics, RegionSeries, Workspace } from '../types'
 
-// Cliente do painel. Fala com a API real (NestJS, PR #1 da api), que usa nomes snake_case
-// e anos inteiros. Converte para o formato que o painel usa.
+// Cliente do painel para a trilha global da API (`/api/global/*`).
+// Converte o contrato snake_case da grade global para o formato do painel.
 
 type Matrix = (number | null)[][]
 
 // Em desenvolvimento a API roda na porta 3000. Em produção, defina VITE_API_URL.
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
+
+// Células exibidas no painel. O endpoint devolve as mais ativas primeiro.
+const GLOBAL_REGION_LIMIT = 24
 
 export class ApiError extends Error {
   status: number
@@ -16,54 +19,69 @@ export class ApiError extends Error {
   }
 }
 
-type ApiRegion = {
+type ApiGlobalRegion = {
   id: string
   name: string
-  biome: string
-  area_km2: number
-  center: [number, number]
-  color: string
-  polygon: [number, number][]
-}
-
-type ApiMetrics = {
   biome?: string
-  current_year_total?: number | null
-  current_year_anomaly_pct?: number | null
-  peak_year?: number | null
-  peak_year_total?: number | null
-  trend_pct_decade?: number | null
-  trend_window?: string | null
-  baseline_mean_annual?: number | null
-  sensor_mix?: { modis_pct?: number; viirs_pct?: number; modis_raw?: number; viirs_raw?: number }
-  harmonization?: { factor_by_region?: number; uncertainty_pct?: number; confidence?: string }
+  color?: string
+  polygon?: [number, number][]
+  center?: [number, number]
+  hotspots?: number
+  first_year?: number
+  last_year?: number
 }
 
-type ApiCalendar = {
+type ApiGlobalRegions = {
+  scope?: string
+  gridDegrees?: number | null
+  total?: number
+  returned?: number
+  regions: ApiGlobalRegion[]
+}
+
+type ApiGlobalCalendar = {
   mode?: string
-  region: { id: string; name: string }
-  years: number[]
+  region: ApiGlobalRegion | null
   months: string[]
+  years: number[]
   counts: Matrix
   raw_modis: Matrix
   raw_viirs: Matrix
-  insights: string[]
   series: {
-    annual: { year: number; total: number | null; partial: boolean; anomaly_pct: number | null }[]
+    annual: {
+      year: number
+      total: number | null
+      partial: boolean
+      anomaly_pct: number | null
+    }[]
   }
-  metrics: ApiMetrics
+  metrics: {
+    current_year?: number
+    current_year_total?: number | null
+    current_year_anomaly_pct?: number | null
+    peak_year?: number | null
+    peak_year_total?: number | null
+    baseline_mean_annual?: number | null
+    modis_total?: number | null
+    viirs_total?: number | null
+  }
+  meta?: {
+    disclaimer?: string
+    method_version?: string
+    baseline_years?: [number, number]
+    grid_degrees?: number | null
+  }
 }
 
-type ApiMeta = { disclaimer?: string; period?: { start?: string; end?: string } }
-
-type ApiHotspotFile = {
+type ApiGlobalHotspotFile = {
+  mode?: string
   features: {
     properties?: {
       id?: string
       date?: string
-      region_id?: string
+      region_id?: string | null
       sensor?: string
-      platform?: string
+      platform?: string | null
       frp_mw?: number | null
       confidence?: number | null
     }
@@ -74,7 +92,6 @@ type ApiHotspotFile = {
 async function getJson<T>(path: string): Promise<T> {
   let response: Response
   try {
-    // Cookies de sessão: a API usa cookie httpOnly, então a requisição precisa levá-lo.
     response = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, { credentials: 'include' })
   } catch {
     throw new ApiError(0, 'Sem conexão com a API.')
@@ -112,73 +129,141 @@ function climatologyFrom(counts: Matrix, months: string[]) {
   })
 }
 
-function metricsFrom(api: ApiMetrics): RegionSeries['metrics'] {
-  return {
-    biome: api.biome ?? '',
-    currentYearTotal: api.current_year_total ?? 0,
-    currentYearAnomaly: api.current_year_anomaly_pct ?? 0,
-    peakYear: api.peak_year ?? 0,
-    peakYearTotal: api.peak_year_total ?? 0,
-    trendPctDecade: api.trend_pct_decade ?? 0,
-    trendWindow: api.trend_window ?? '',
-    modisPct: api.sensor_mix?.modis_pct ?? 0,
-    viirsPct: api.sensor_mix?.viirs_pct ?? 0,
-    modisRaw: api.sensor_mix?.modis_raw ?? 0,
-    viirsRaw: api.sensor_mix?.viirs_raw ?? 0,
-    factor: api.harmonization?.factor_by_region ?? 1,
-    uncertaintyPct: api.harmonization?.uncertainty_pct ?? 0,
-    confidence: api.harmonization?.confidence ?? '',
-    baselineMeanAnnual: api.baseline_mean_annual ?? 0,
+function trendPerDecade(points: { year: number; total: number }[]): number {
+  if (points.length < 2) return 0
+  const xs = points.map((point) => point.year)
+  const ys = points.map((point) => point.total)
+  const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length
+  const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length
+  if (meanY === 0) return 0
+  let numerator = 0
+  let denominator = 0
+  for (let index = 0; index < xs.length; index += 1) {
+    numerator += (xs[index] - meanX) * (ys[index] - meanY)
+    denominator += (xs[index] - meanX) ** 2
   }
+  if (denominator === 0) return 0
+  return ((numerator / denominator) * 10 / meanY) * 100
 }
 
-function regionSeriesFrom(region: ApiRegion, calendar: ApiCalendar): RegionSeries {
+function formatShare(value: number): string {
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
+}
+
+function regionSeriesFrom(region: ApiGlobalRegion, calendar: ApiGlobalCalendar): RegionSeries {
+  const annual = calendar.series.annual.map((point) => ({
+    year: point.year,
+    total: point.total ?? 0,
+    partial: point.partial,
+    anomaly: point.anomaly_pct ?? 0,
+  }))
+  const latest =
+    [...annual].reverse().find((point) => point.total > 0) ??
+    annual[annual.length - 1]
+  const baseline = calendar.meta?.baseline_years ?? [2003, 2025]
+  const modisRaw = calendar.metrics.modis_total ?? 0
+  const viirsRaw = calendar.metrics.viirs_total ?? 0
+  const rawTotal = modisRaw + viirsRaw
+  const modisPct = rawTotal > 0 ? (modisRaw / rawTotal) * 100 : 0
+  const viirsPct = rawTotal > 0 ? (viirsRaw / rawTotal) * 100 : 0
+  const withData = annual.filter((point) => point.total > 0)
+  const peak =
+    withData.reduce<{ year: number; total: number } | null>(
+      (best, point) => (best === null || point.total > best.total ? point : best),
+      null,
+    )
+  const peakYear = calendar.metrics.peak_year ?? peak?.year ?? 0
+  const peakTotal = calendar.metrics.peak_year_total ?? peak?.total ?? 0
+
+  const metrics: RegionMetrics = {
+    biome: region.biome ?? 'Grade global',
+    currentYearTotal: latest?.total ?? 0,
+    currentYearAnomaly: latest?.anomaly ?? 0,
+    peakYear,
+    peakYearTotal: peakTotal,
+    trendPctDecade: trendPerDecade(annual),
+    trendWindow: `${baseline[0]}–${baseline[1]}`,
+    modisPct,
+    viirsPct,
+    modisRaw,
+    viirsRaw,
+    // A API global aplica o fator por célula/mês ao montar `counts`.
+    factor: 1,
+    uncertaintyPct: 0,
+    confidence: 'global',
+    baselineMeanAnnual: calendar.metrics.baseline_mean_annual ?? 0,
+  }
+
   const climatology = climatologyFrom(calendar.counts, calendar.months)
-  const peak = climatology.reduce((best, month) => (month.mean > best.mean ? month : best), climatology[0])
+  const peakMonth = climatology.reduce(
+    (best, month) => (month.mean > best.mean ? month : best),
+    climatology[0],
+  )
+
   return {
     id: region.id,
     name: region.name,
-    color: region.color,
-    ring: region.polygon,
+    color: region.color ?? '#4E79A7',
+    ring: region.polygon ?? [],
     counts: calendar.counts,
     rawModis: calendar.raw_modis,
     rawViirs: calendar.raw_viirs,
-    insights: calendar.insights,
-    metrics: metricsFrom(calendar.metrics),
+    insights: [
+      `Célula global ${region.name} (grade de ${calendar.meta?.grid_degrees ?? '—'}°).`,
+      peakYear > 0
+        ? `Pico histórico em ${peakYear}: ${peakTotal.toLocaleString('pt-BR')} focos.`
+        : 'Sem pico histórico disponível.',
+      `MODIS ${formatShare(modisPct)} · VIIRS ${formatShare(viirsPct)} dos focos brutos.`,
+    ],
+    metrics,
     climatology,
-    annual: calendar.series.annual.map((point) => ({
-      year: point.year,
-      total: point.total ?? 0,
-      partial: Boolean(point.partial),
-      anomaly: point.anomaly_pct ?? 0,
-    })),
-    peakMonthLabel: peak && peak.mean > 0 ? peak.label : '—',
+    annual,
+    peakMonthLabel: peakMonth && peakMonth.mean > 0 ? peakMonth.label : '—',
   }
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
   await getJson<{ status: string }>('/health')
-  const meta = await getJson<ApiMeta>('/meta')
-  const regions = await getJson<ApiRegion[]>('/regions')
-  const calendars = await Promise.all(
-    regions.map((region) => getJson<ApiCalendar>(`/calendar?region=${encodeURIComponent(region.id)}&from=2000&to=2026`)),
+  const response = await getJson<ApiGlobalRegions>(
+    `/global/regions?limit=${GLOBAL_REGION_LIMIT}`,
   )
-  const first = calendars[0]
-  if (!first) throw new ApiError(404, 'A API não devolveu calendários.')
+  const regions = response.regions ?? []
+  if (regions.length === 0) {
+    throw new ApiError(
+      404,
+      'A grade global ainda não tem dados. A ingestão global está em andamento.',
+    )
+  }
+
+  // Se a ingestão estiver escrevendo no SQLite, alguma célula pode falhar.
+  const calendars = await Promise.all(
+    regions.map((region) =>
+      getJson<ApiGlobalCalendar>(
+        `/global/calendar?region=${encodeURIComponent(region.id)}&from=2000&to=2026`,
+      ).catch(() => null),
+    ),
+  )
+  const pairs = regions
+    .map((region, index) => ({ region, calendar: calendars[index] }))
+    .filter((pair): pair is { region: ApiGlobalRegion; calendar: ApiGlobalCalendar } =>
+      pair.calendar !== null,
+    )
+  const first = pairs[0]
+  if (!first) throw new ApiError(404, 'A API não devolveu calendários globais.')
 
   return {
-    years: first.years,
-    months: first.months,
+    years: first.calendar.years,
+    months: first.calendar.months,
     disclaimer:
-      meta.disclaimer ??
-      'Série harmonizada em construção. Os números desta tela não devem ser usados para decisão operacional.',
+      first.calendar.meta?.disclaimer ??
+      'Contagens globais derivadas de focos ativos NASA FIRMS/Earthdata. Uso informativo; não substitui validação oficial.',
     hotspots: [],
-    regions: regions.map((region, index) => regionSeriesFrom(region, calendars[index])),
+    regions: pairs.map((pair) => regionSeriesFrom(pair.region, pair.calendar)),
   }
 }
 
 export async function loadHotspots(): Promise<Hotspot[]> {
-  const points = await getJson<ApiHotspotFile>('/hotspots?from=2024&to=2026')
+  const points = await getJson<ApiGlobalHotspotFile>('/global/hotspots?from=2024&to=2026')
   const hotspots: Hotspot[] = []
   for (const feature of points.features) {
     const coords = feature.geometry?.coordinates

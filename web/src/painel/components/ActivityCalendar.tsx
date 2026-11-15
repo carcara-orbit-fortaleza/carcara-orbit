@@ -80,7 +80,7 @@ export function ActivityCalendar({ years, months, calendar, caption, period }: P
 
       {calendar.mode === 'empty' ? (
         <p className="empty-calendar">
-          Nenhum bioma da série cai dentro do polígono. Desenhe sobre a Amazônia, o Cerrado, o Pantanal, a Caatinga, a Mata Atlântica ou o Pampa.
+          Nenhuma célula da série cai dentro do polígono. Desenhe sobre uma célula da grade global.
         </p>
       ) : (
         <div className="calendar-wrap">

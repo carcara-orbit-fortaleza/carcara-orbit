@@ -1,11 +1,12 @@
 # Ingestão global (API)
 
-A ingestão global é uma trilha separada do dataset Brasil usado pela web. Ela
-baixa o arquivo histórico mundial da NASA FIRMS, grava em um SQLite próprio
-(`data/db/global.sqlite`) e expõe consultas globais em `/api/global/*`.
+A ingestão global é a trilha usada pela web (globo da home e painel). Ela baixa
+o arquivo histórico mundial da NASA FIRMS, grava em um SQLite próprio
+(`data/db/global.sqlite`) e expõe consultas globais em `/api/global/*`. O
+dataset Brasil e seus endpoints continuam disponíveis para compatibilidade.
 
-> A web não foi alterada. Nesta entrega o escopo global está disponível na API;
-> a interface continua centrada no Brasil e nas seis regiões existentes.
+> O globo da home consulta `/api/global/hotspots` e o painel consulta
+> `/api/global/regions` + `/api/global/calendar`.
 
 ## Fonte de dados
 
@@ -97,6 +98,17 @@ curl -X POST http://localhost:3000/api/global/ingest \
   -H "X-Admin-Token: $ADMIN_TOKEN" \
   -d '{"countries":"all","maxFiles":20,"gridDegrees":10}'
 ```
+
+## Web
+
+- **Globo da home** (`web/src/data/hotspots.ts`): usa
+  `/api/global/hotspots` com bbox mundial.
+- **Painel** (`web/src/painel/data/api.ts`): carrega as células mais ativas com
+  `/api/global/regions?limit=24` e o calendário de cada uma em
+  `/api/global/calendar?region=...`. As células aparecem nos chips e no mapa;
+  o usuário também pode desenhar um polígono.
+- A grade do painel é a de 10°. Para agregar outro recorte, use `bbox` nos
+  endpoints globais.
 
 ### Corpo do POST `/api/global/ingest`
 

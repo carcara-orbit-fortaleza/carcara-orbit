@@ -73,7 +73,7 @@ export function PolygonMap({
       L.tileLayer(TILES, {
         maxZoom: 12,
         minZoom: 3,
-        attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ · dados mockados',
+        attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ · dados NASA FIRMS',
       }).addTo(map)
       L.control.zoom({ position: 'topright' }).addTo(map)
       biomeLayerRef.current = L.layerGroup().addTo(map)
@@ -316,7 +316,7 @@ export function PolygonMap({
               ? 'Clique para marcar vértices. Feche no primeiro ponto.'
               : polygon
                 ? 'Polígono ativo. Os focos de fora ficam de fora do recorte.'
-                : 'O bioma selecionado está em destaque. Os demais ficam tracejados.'}
+                : 'A célula selecionada está em destaque. As demais ficam tracejadas.'}
           </p>
         </div>
       )}

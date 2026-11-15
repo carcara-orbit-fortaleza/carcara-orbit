@@ -46,7 +46,7 @@ export function RiskCalculator({ regions, years, initialRegionId }: Props) {
             Premissas de custo e de postos são exemplos: troque pelos valores reais.
           </p>
         </div>
-        <span className="tag mono">h1.0-mock</span>
+        <span className="tag mono">h1.0</span>
       </header>
 
       <div className="calc-grid">

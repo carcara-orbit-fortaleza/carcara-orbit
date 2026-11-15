@@ -36,7 +36,7 @@ export default function App() {
   const [hotspotsError, setHotspotsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [hotspotsLoading, setHotspotsLoading] = useState(true)
-  const [regionId, setRegionId] = useState('pantanal')
+  const [regionId, setRegionId] = useState('')
   const [polygon, setPolygon] = useState<LonLat[] | null>(null)
   const [period, setPeriod] = useState<Period>('all')
   const [shellAttempt, setShellAttempt] = useState(0)
@@ -111,8 +111,8 @@ export default function App() {
     : calendar.mode === 'empty'
       ? 'Sem interseção com a série harmonizada'
       : calendar.mode === 'polygon'
-        ? 'Focos harmonizados ponderados pela área de cada bioma dentro do polígono · h1.0-mock'
-        : `Focos harmonizados · ${region.name} · h1.0-mock`
+        ? 'Focos harmonizados ponderados pela área de cada célula dentro do polígono · h1.0'
+        : `Focos harmonizados · ${region.name} · h1.0`
 
   return (
     <div className="app">
@@ -135,8 +135,8 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <div className="mock-badge"><span className="dot" />Dados mockados</div>
-          <p>Protótipo para demonstração. Não usar para decisão operacional.</p>
+          <div className="mock-badge"><span className="dot" />Dados NASA FIRMS</div>
+          <p>Grade global de 10°. Dados informativos; não substituem validação oficial.</p>
           <div className="sensor-mini">
             <span><i className="sensor-dot modis" />MODIS</span>
             <span><i className="sensor-dot viirs" />VIIRS</span>
@@ -147,7 +147,7 @@ export default function App() {
       <main id="topo">
         <header className="topbar">
           <div className="topbar-title">
-            <p className="eyebrow">CALENDÁRIO HARMONIZADO · 2000—2026</p>
+            <p className="eyebrow">CALENDÁRIO HARMONIZADO GLOBAL · 2000—2026</p>
             <h1>Atividade de queimadas</h1>
             <p className="sub">MODIS e VIIRS em uma única série. O polígono no mapa recorta focos e calendário.</p>
           </div>
@@ -199,8 +199,8 @@ export default function App() {
             </section>
 
             <section className="kpis" aria-label="Indicadores principais">
-              <Kpi label="Focos em 2026" value={formatCount(board.currentTotal)} unit="focos" foot="jan–out · ano parcial" delta={signed(board.currentAnomaly) + '%'} up={board.currentAnomaly >= 0} accent="var(--ember)" />
-              <Kpi label="Anomalia 2026" value={`${signed(board.currentAnomaly)}%`} foot="vs. média 2003–2025" delta={board.currentAnomaly >= 0 ? 'acima' : 'abaixo'} up={board.currentAnomaly >= 0} accent="var(--amber)" />
+              <Kpi label={`Focos em ${board.currentYear}`} value={formatCount(board.currentTotal)} unit="focos" foot="último ano com dados" delta={signed(board.currentAnomaly) + '%'} up={board.currentAnomaly >= 0} accent="var(--ember)" />
+              <Kpi label={`Anomalia ${board.currentYear}`} value={`${signed(board.currentAnomaly)}%`} foot="vs. média 2003–2025" delta={board.currentAnomaly >= 0 ? 'acima' : 'abaixo'} up={board.currentAnomaly >= 0} accent="var(--amber)" />
               <Kpi label="Pico histórico" value={String(board.peakYear)} foot={`${formatCount(board.peakTotal)} focos · ano completo`} delta="máximo" accent="var(--danger)" />
               <Kpi label="Tendência" value={`${signed(board.trend)}%`} unit="/década" foot={`${board.trendWindow} · regressão linear`} delta={board.trend >= 0 ? 'alta' : 'queda'} up={board.trend >= 0} accent="var(--teal)" />
             </section>
@@ -230,7 +230,7 @@ export default function App() {
                   <header className="card-head"><h2>Método</h2><span className="tag mono">h1.0</span></header>
                   <dl className="method-list">
                     <div><dt>Janela de calibração</dt><dd>2012—2025</dd></div>
-                    <div><dt>Fator regional</dt><dd>×{board.factor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
+                    <div><dt>Fator da célula</dt><dd>×{board.factor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
                     <div><dt>Incerteza estimada</dt><dd>±{Math.round(board.uncertainty)}%</dd></div>
                     <div><dt>Baseline</dt><dd>2003—2025</dd></div>
                   </dl>
@@ -291,7 +291,7 @@ export default function App() {
                     <button className="mini-btn" type="button" onClick={() => download(`carcara-orbit_${place}_aoi.geojson`, areaGeoJson(polygon ?? region.ring, board.name), 'application/geo+json')}>Baixar</button>
                   </li>
                 </ul>
-                <div className="export-foot"><span className="mono">h1.0-mock</span><span>Dados sintéticos</span></div>
+                <div className="export-foot"><span className="mono">h1.0</span><span>Dados globais</span></div>
               </article>
             </section>
 
@@ -332,15 +332,15 @@ export default function App() {
 
             <dialog ref={methodRef} className="method-dialog">
               <header>
-                <div><h2>Harmonização</h2><p>Versão h1.0-mock · dados sintéticos</p></div>
+                <div><h2>Harmonização</h2><p>Versão h1.0 · dados globais</p></div>
                 <button className="btn ghost" type="button" onClick={() => methodRef.current?.close()}>Fechar</button>
               </header>
               <div className="method-prose">
                 <ol>
                   <li><strong>Ingestão.</strong> Focos MODIS C6.1 e VIIRS 375 m.</li>
                   <li><strong>Limpeza.</strong> Baixa confiança, nuvem, borda e duplicata do mesmo sobrevoo saem da contagem.</li>
-                  <li><strong>Agregação.</strong> Grade de 0,1° e contagem por cluster.</li>
-                  <li><strong>Calibração.</strong> Na janela 2012–2025, o fator é a mediana de VIIRS sobre MODIS, por bioma e mês.</li>
+                  <li><strong>Agregação.</strong> Grade global de 10° e contagem por cluster.</li>
+                  <li><strong>Calibração.</strong> Na janela 2012–2025, o fator é a mediana de VIIRS sobre MODIS, por célula e mês.</li>
                   <li><strong>Série.</strong> A contagem exibida é a harmonizada. A anomalia compara com a média de 2003–2025 do mesmo mês.</li>
                 </ol>
                 <p className="warn">{data.disclaimer}</p>

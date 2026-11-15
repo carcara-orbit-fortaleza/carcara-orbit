@@ -33,8 +33,8 @@ export function calendarCsv(calendar: FilteredCalendar, years: number[], place: 
         num(calendar.anomaly[yearIndex]?.[month] ?? null, 1),
         num(calendar.rawModis[yearIndex]?.[month] ?? null, 0),
         num(calendar.rawViirs[yearIndex]?.[month] ?? null, 0),
-        'h1.0-mock',
-        'mock-1.0',
+        'h1.0',
+        'global-1.0',
       ])
     }
   })
@@ -53,7 +53,7 @@ export function hotspotCsv(hotspots: Hotspot[]): string {
     num(hotspot.frp, 1),
     String(hotspot.confidence),
     hotspot.regionId,
-    'h1.0-mock',
+    'h1.0',
   ])]
   return `\uFEFF${rows.map((row) => row.join(';')).join('\r\n')}`
 }
@@ -64,7 +64,7 @@ export function areaGeoJson(ring: LonLat[], name: string): string {
     : [...ring, ring[0]]
   return JSON.stringify({
     type: 'Feature',
-    properties: { name, method_version: 'h1.0-mock' },
+    properties: { name, method_version: 'h1.0' },
     geometry: { type: 'Polygon', coordinates: [closed] },
   }, null, 2)
 }

@@ -223,57 +223,79 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ## Dados analíticos na VPS
 
-Nesta fase, o Postgres guarda o histórico operacional (`operation_runs`) e a
-saúde do serviço. A série analítica continua em `data/db/firms.sqlite` e em
-`data/real/`, persistidos no volume `api_data`.
+O Postgres guarda o histórico operacional (`operation_runs`) e a saúde do
+serviço. A série exibida na web vem da **trilha global**, persistida no volume
+`api_data`:
 
-Para carregar dados reais após o primeiro deploy:
+- `data/db/global.sqlite` — focos e clusters mundiais;
+- `data/runtime/global-*.json` — grade, calibração, status e checkpoints;
+- `data/raw/global/` — CSVs originais da FIRMS.
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --env-file .env exec -T api npm run bootstrap
-```
+O globo da home consome `/api/global/hotspots` e o painel
+`/api/global/regions` + `/api/global/calendar`. O dataset Brasil
+(`data/db/firms.sqlite` + `data/real/`) e os endpoints `/api/hotspots`,
+`/api/regions` e `/api/calendar` continuam disponíveis para compatibilidade; a
+variável `DATA_SOURCE` controla apenas essa trilha legada.
 
-Depois, ajuste `DATA_SOURCE=real` e reinicie a API.
+### Carga histórica global
 
-### Ingestão global
-
-A trilha mundial grava em `data/db/global.sqlite` e não interfere no dataset
-Brasil. Na VPS:
+A carga completa tem **10.095 arquivos (~43,5 GB)** e é retomável. Valide o
+plano e o piloto primeiro:
 
 ```bash
 cd ~/dev/carcara-orbit
 
-# 1. Piloto (não baixa os ~43 GB)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --env-file .env exec -T api npm run global -- \
-  --dry-run --countries all --grid 10 --max-files 20 --json
+# plano, sem baixar
+docker exec carcara-orbit-api-1 npm run global -- \
+  --dry-run --countries all --grid 10 --json
 
-# 2. Carga em lotes (retomável)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --env-file .env exec -T api npm run global -- \
-  --countries all --grid 10 --max-files 200
-
-# 3. Repetir até completar; acompanhar
-curl https://$APP_HOST/api/global/status
-
-# 4. Atualização NRT do ano corrente (requer FIRMS_MAP_KEY)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --env-file .env exec -T api npm run global -- --current --grid 10
+# piloto de 20 arquivos
+docker exec carcara-orbit-api-1 npm run global -- \
+  --countries all --grid 10 --max-files 20
 ```
 
-Também é possível disparar pela API:
+Para a carga completa, rode em um container separado: um deploy da API
+recreia o container e mataria o processo. O container abaixo compartilha o
+volume e sobrevive aos deploys:
+
+```bash
+docker run -d --name carcara-global-ingest \
+  -v carcara-orbit_api_data:/app/data \
+  carcara-orbit-api:latest \
+  sh -c 'npm run global -- --countries all --grid 10 \
+    > /app/data/runtime/global-full.log 2>&1'
+```
+
+Acompanhe:
+
+```bash
+docker exec carcara-global-ingest tail -f /app/data/runtime/global-full.log
+curl https://$APP_HOST/api/global/status
+```
+
+Alternativa em lotes, pelo CLI (retomável; repita até completar):
+
+```bash
+docker exec carcara-orbit-api-1 npm run global -- \
+  --countries all --grid 10 --max-files 200
+```
+
+Também é possível disparar pela API (defina `ADMIN_TOKEN` antes de expor o
+endpoint):
 
 ```bash
 curl -X POST https://$APP_HOST/api/global/ingest \
   -H "Content-Type: application/json" \
   -H "X-Admin-Token: $ADMIN_TOKEN" \
-  -d '{"countries":"all","maxFiles":200,"gridDegrees":10}'
+  -d '{"countries":"all","gridDegrees":10}'
 ```
 
-Acompanhe `data/db/global.sqlite`, `data/runtime/global-download.json` e
-`data/runtime/global-ingestion.json` no volume `api_data`. O caminho para
-PostGIS e escala está em [`REQUISITOS.md`](./REQUISITOS.md).
+A ingestão atualiza `data/db/global.sqlite`, `data/runtime/global-download.json`
+e `data/runtime/global-ingestion.json`. O caminho para PostGIS e escala está em
+[`REQUISITOS.md`](./REQUISITOS.md).
+
+> O comando `npm run bootstrap` continua disponível para a trilha Brasil
+> (endpoints legados), mas não é mais necessário para a web.
 
 ## Rollback
 

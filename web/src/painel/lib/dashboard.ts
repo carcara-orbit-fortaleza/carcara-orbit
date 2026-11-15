@@ -9,6 +9,7 @@ export type Dashboard = {
   confidence: string
   factor: number
   uncertainty: number
+  currentYear: number
   currentTotal: number
   currentAnomaly: number
   peakYear: number
@@ -31,7 +32,8 @@ const BASELINE_TO = 2025
 
 export function dashboardForRegion(region: RegionSeries): Dashboard {
   const metrics = region.metrics
-  const currentIndex = region.annual.findIndex((point) => point.year === 2026)
+  const currentIndex = latestYearIndex(region.annual)
+  const current = currentIndex >= 0 ? region.annual[currentIndex] : null
   return {
     name: region.name,
     biome: metrics.biome,
@@ -39,8 +41,9 @@ export function dashboardForRegion(region: RegionSeries): Dashboard {
     confidence: metrics.confidence,
     factor: metrics.factor,
     uncertainty: metrics.uncertaintyPct,
-    currentTotal: metrics.currentYearTotal,
-    currentAnomaly: metrics.currentYearAnomaly,
+    currentYear: current?.year ?? 2026,
+    currentTotal: current?.total ?? metrics.currentYearTotal,
+    currentAnomaly: current?.anomaly ?? metrics.currentYearAnomaly,
     peakYear: metrics.peakYear,
     peakTotal: metrics.peakYearTotal,
     trend: metrics.trendPctDecade,
@@ -66,8 +69,10 @@ export function dashboardForPolygon(
   const annual = annualSeries(calendar.counts, years)
   const baselineYears = annual.filter((point) => point.year >= BASELINE_FROM && point.year <= BASELINE_TO && !point.partial)
   const baselineAnnual = mean(baselineYears.map((point) => point.total))
-  const current = annual.find((point) => point.year === 2026)
-  const currentAnomaly = currentYearAnomaly(calendar.counts, years)
+  const currentIndex = latestYearIndex(annual)
+  const current = currentIndex >= 0 ? annual[currentIndex] : null
+  const currentYear = current?.year ?? 2026
+  const currentAnomaly = anomalyForYear(calendar.counts, years, currentYear)
   const peak = baselineYears.reduce<AnnualPoint | null>(
     (best, point) => (best === null || point.total > best.total ? point : best),
     null,
@@ -83,10 +88,11 @@ export function dashboardForPolygon(
   return {
     name: 'Recorte do mapa',
     biome: active.map((weight) => weight.name).join(' · '),
-    insights: polygonInsights(active, currentAnomaly, hotspotInside),
+    insights: polygonInsights(active, currentAnomaly, hotspotInside, currentYear),
     confidence: 'estimada',
     factor,
     uncertainty,
+    currentYear,
     currentTotal: current?.total ?? 0,
     currentAnomaly,
     peakYear: peak?.year ?? 0,
@@ -98,10 +104,10 @@ export function dashboardForPolygon(
     modisRaw: sensor.modisRaw,
     viirsRaw: sensor.viirsRaw,
     climatology,
-    currentMonths: calendar.counts[years.indexOf(2026)] ?? Array.from({ length: 12 }, () => null),
+    currentMonths: calendar.counts[years.indexOf(currentYear)] ?? Array.from({ length: 12 }, () => null),
     annual: annual.map((point) => ({
       ...point,
-      anomaly: point.year === 2026
+      anomaly: point.year === currentYear
         ? currentAnomaly
         : baselineAnnual === 0
           ? 0
@@ -110,6 +116,13 @@ export function dashboardForPolygon(
     baselineAnnual,
     peakMonthLabel: climatology[peakMonth]?.label ?? '',
   }
+}
+
+function latestYearIndex(annual: AnnualPoint[]): number {
+  for (let index = annual.length - 1; index >= 0; index -= 1) {
+    if (annual[index].total > 0) return index
+  }
+  return annual.length - 1
 }
 
 function currentMonthsFromAnnual(region: RegionSeries, currentIndex: number): (number | null)[] {
@@ -132,8 +145,8 @@ function annualSeries(counts: (number | null)[][], years: number[]): AnnualPoint
   })
 }
 
-function currentYearAnomaly(counts: (number | null)[][], years: number[]): number {
-  const currentIndex = years.indexOf(2026)
+function anomalyForYear(counts: (number | null)[][], years: number[], year: number): number {
+  const currentIndex = years.indexOf(year)
   if (currentIndex < 0) return 0
   const row = counts[currentIndex] ?? []
   let current = 0
@@ -143,9 +156,9 @@ function currentYearAnomaly(counts: (number | null)[][], years: number[]): numbe
     if (row[month] === null || row[month] === undefined) continue
     const values: number[] = []
     for (let yearIndex = 0; yearIndex < years.length; yearIndex++) {
-      const year = years[yearIndex]
+      const candidate = years[yearIndex]
       const value = counts[yearIndex]?.[month]
-      if (year >= BASELINE_FROM && year <= BASELINE_TO && value !== null && value !== undefined) values.push(value)
+      if (candidate >= BASELINE_FROM && candidate <= BASELINE_TO && value !== null && value !== undefined) values.push(value)
     }
     if (values.length === 0) continue
     current += row[month] as number
@@ -182,7 +195,7 @@ function sensorMix(rawModis: (number | null)[][], rawViirs: (number | null)[][])
   }
 }
 
-function polygonInsights(active: RegionWeight[], anomaly: number, hotspotInside: number): string[] {
+function polygonInsights(active: RegionWeight[], anomaly: number, hotspotInside: number, year: number): string[] {
   const cover = active
     .slice()
     .sort((a, b) => b.weight - a.weight)
@@ -191,8 +204,8 @@ function polygonInsights(active: RegionWeight[], anomaly: number, hotspotInside:
     .join(', ')
   const direction = anomaly >= 0 ? 'acima' : 'abaixo'
   return [
-    cover ? `O polígono cobre ${cover} de cada bioma.` : 'O polígono não cruza os biomas da série.',
-    `O acumulado de 2026 (jan–out) está ${formatSignedPercent(anomaly)} ${direction} da média do mesmo período nesse recorte.`,
+    cover ? `O polígono cobre ${cover} de cada célula.` : 'O polígono não cruza as células da série.',
+    `O acumulado de ${year} está ${formatSignedPercent(anomaly)} ${direction} da média do mesmo período nesse recorte.`,
     `${hotspotInside.toLocaleString('pt-BR')} focos da amostra 2024–2026 caem dentro do desenho.`,
   ]
 }

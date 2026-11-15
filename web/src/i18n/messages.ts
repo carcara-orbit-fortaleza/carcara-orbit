@@ -15,7 +15,7 @@ export const messages = {
     navStatus: 'Estado',
     navDashboard: 'Abrir o painel',
 
-    globeLabel: 'Globo 3D interativo com focos de calor sobre o Brasil e a órbita do satélite.',
+    globeLabel: 'Globo 3D interativo com focos de calor ao redor do mundo e a órbita do satélite.',
     heroKicker: 'Calendário de atividade de queimadas',
     heroLead:
       'Harmonizamos mais de duas décadas de focos de calor do MODIS e do VIIRS, da NASA, em uma série única e comparável.',
@@ -44,7 +44,7 @@ export const messages = {
       'O Carcará Orbit transforma os dois sensores em uma leitura única. A origem do dado continua disponível, mas não atrapalha a leitura.',
     pillarOneTitle: 'Harmonização explícita',
     pillarOneBody:
-      'Grade de 0,1°, contagem por cluster e calibração na janela 2012–2025, por bioma e por mês.',
+      'Grade global de 10°, contagem por cluster e calibração na janela 2012–2025, por célula e por mês.',
     pillarTwoTitle: 'Incerteza à vista',
     pillarTwoBody:
       'Fator de calibração, janela de sobreposição e confiança aparecem na interface, não escondidos em nota de rodapé.',
@@ -66,7 +66,7 @@ export const messages = {
     step2Title: 'Limpar',
     step2Body: 'Remove baixa confiança, nuvens, bordas e duplicatas da mesma passagem.',
     step3Title: 'Agregar',
-    step3Body: 'Grade de 0,1° e contagem por cluster, não por pixel.',
+    step3Body: 'Grade global de 10° e contagem por cluster, não por pixel.',
     step4Title: 'Calibrar',
     step4Body: 'Fator f = mediana(N_VIIRS / N_MODIS) na janela 2012–2025, por bioma e mês.',
     step5Title: 'Harmonizar',
@@ -129,7 +129,7 @@ export const messages = {
     navStatus: 'Status',
     navDashboard: 'Open the dashboard',
 
-    globeLabel: 'Interactive 3D globe with fire hotspots over Brazil and the satellite orbit.',
+    globeLabel: 'Interactive 3D globe with fire hotspots around the world and the satellite orbit.',
     heroKicker: 'Fire activity calendar',
     heroLead:
       'We harmonize more than two decades of NASA MODIS and VIIRS fire hotspots into one comparable series. In a minute, a manager can see whether this month is outside the normal range for their region.',

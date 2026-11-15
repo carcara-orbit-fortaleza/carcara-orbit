@@ -1,5 +1,5 @@
-// Cliente dos focos reais da API. Sem API ou sem dados ingeridos, retorna null
-// e o globo mantém a demonstração.
+// Cliente dos focos globais da API. Sem API ou sem dados ingeridos, retorna
+// null e o globo mantém a demonstração.
 
 export type FireConfidence = 'low' | 'nominal' | 'high' | 'unknown'
 
@@ -18,32 +18,33 @@ export interface RecentFires {
 // Em desenvolvimento a API roda na porta 3000. Em produção, defina VITE_API_URL.
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
-// Brasil: oeste, sul, leste, norte.
-const BRAZIL_BBOX = '-74,-34,-34,6'
+// Mundo inteiro: oeste, sul, leste, norte.
+const WORLD_BBOX = '-180,-90,180,90'
 
-// Contrato atual da API (PR #1): `mode` indica a fonte e os focos trazem `frp_mw` e `confidence_class`.
 interface HotspotsResponse {
-  mode: 'mock' | 'real'
+  mode: 'mock' | 'real' | 'global'
   total: number
   features: {
     geometry: { coordinates: [number, number] }
-    properties: { frp_mw: number | null; confidence_class: 'alta' | 'nominal' | 'baixa' }
+    properties: { frp_mw: number | null; confidence_class: string }
   }[]
 }
 
-const CONFIDENCE: Record<'alta' | 'nominal' | 'baixa', FireConfidence> = {
+const CONFIDENCE: Record<string, FireConfidence> = {
   alta: 'high',
+  high: 'high',
   nominal: 'nominal',
   baixa: 'low',
+  low: 'low',
 }
 
 export async function fetchRecentFires(limit: number, signal?: AbortSignal): Promise<RecentFires | null> {
   try {
-    const response = await fetch(`${API_BASE}/hotspots?bbox=${BRAZIL_BBOX}&limit=${limit}`, { signal })
+    const response = await fetch(`${API_BASE}/global/hotspots?bbox=${WORLD_BBOX}&limit=${limit}`, { signal })
     if (!response.ok) return null
     const json = (await response.json()) as HotspotsResponse
-    // Só aceita dados reais. Os de demonstração ficam por conta do próprio globo.
-    if (json.mode !== 'real' || !Array.isArray(json.features)) return null
+    // Só aceita dados globais reais. Sem focos, o globo mantém a demonstração.
+    if (json.mode !== 'global' || !Array.isArray(json.features) || json.features.length === 0) return null
     return {
       total: json.total,
       points: json.features.map((feature) => ({

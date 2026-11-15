@@ -6,8 +6,8 @@
    "type": "Feature",
    "properties": {
     "id": "amazonia",
-    "name": "Amazônia",
-    "biome": "Floresta tropical",
+    "name": "Amazon",
+    "biome": "Tropical forest",
     "area_km2": 4196943,
     "color": "#3E8E63"
    },
@@ -76,7 +76,7 @@
    "properties": {
     "id": "cerrado",
     "name": "Cerrado",
-    "biome": "Savana tropical",
+    "biome": "Tropical savanna",
     "area_km2": 2036448,
     "color": "#C98A2E"
    },
@@ -125,7 +125,7 @@
    "properties": {
     "id": "pantanal",
     "name": "Pantanal",
-    "biome": "Área úmida",
+    "biome": "Wetland",
     "area_km2": 150355,
     "color": "#4F9AA8"
    },
@@ -166,7 +166,7 @@
    "properties": {
     "id": "caatinga",
     "name": "Caatinga",
-    "biome": "Floresta seca",
+    "biome": "Dry forest",
     "area_km2": 844453,
     "color": "#A98B5C"
    },
@@ -206,8 +206,8 @@
    "type": "Feature",
    "properties": {
     "id": "mata-atlantica",
-    "name": "Mata Atlântica",
-    "biome": "Floresta costeira",
+    "name": "Atlantic Forest",
+    "biome": "Coastal forest",
     "area_km2": 1110182,
     "color": "#2F7F72"
    },
@@ -260,7 +260,7 @@
    "properties": {
     "id": "pampa",
     "name": "Pampa",
-    "biome": "Campo subtropical",
+    "biome": "Subtropical grassland",
     "area_km2": 176496,
     "color": "#7E9A4E"
    },

@@ -13,7 +13,7 @@ export class CalendarController {
     @Query('to') to?: string,
   ) {
     if (!region) {
-      throw new BadRequestException('region é obrigatório');
+      throw new BadRequestException('region is required');
     }
     return this.calendar.getCalendar(region, from, to);
   }

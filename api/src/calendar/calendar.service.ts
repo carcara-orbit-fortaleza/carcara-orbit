@@ -27,7 +27,7 @@ export class CalendarService {
   getCalendar(regionId: string, from?: unknown, to?: unknown): CalendarResponse {
     const region = this.data.findRegion(regionId);
     if (!region) {
-      throw new NotFoundException(`Região não encontrada: ${regionId}`);
+      throw new NotFoundException(`Region not found: ${regionId}`);
     }
     const period = parseYearRange(from, to);
     const { dataset } = this.data;

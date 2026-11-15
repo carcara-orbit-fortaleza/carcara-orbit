@@ -4,7 +4,7 @@ import { assignRegion } from '../lib/geo.js';
 import { gridRegionAt } from '../lib/grid.js';
 import { AppError } from '../lib/errors.js';
 
-const CONFIDENCE_CLASSES = new Set(['baixa', 'nominal', 'alta']);
+const CONFIDENCE_CLASSES = new Set(['low', 'nominal', 'high']);
 
 function normalizePlatform(value) {
   const raw = String(value ?? '').trim();
@@ -26,28 +26,28 @@ function normalizeDayNight(value) {
 function normalizeConfidence(value, sensor) {
   if (sensor === 'MODIS') {
     const number = Number(value);
-    if (!Number.isFinite(number)) return { score: null, className: 'baixa' };
-    if (number >= 80) return { score: number, className: 'alta' };
+    if (!Number.isFinite(number)) return { score: null, className: 'low' };
+    if (number >= 80) return { score: number, className: 'high' };
     if (number >= 30) return { score: number, className: 'nominal' };
-    return { score: number, className: 'baixa' };
+    return { score: number, className: 'low' };
   }
 
   const key = String(value ?? '').trim().toLowerCase();
   // FIRMS VIIRS files use both words (low/nominal/high) and single letters
   // (l/n/h). The Area API commonly returns single-letter codes.
-  if (key === 'h' || key === 'high' || key === 'alta') return { score: 90, className: 'alta' };
+  if (key === 'h' || key === 'high' || key === 'alta') return { score: 90, className: 'high' };
   if (key === 'n' || key === 'nominal' || key === 'medium' || key === 'média' || key === 'media') {
     return { score: 60, className: 'nominal' };
   }
-  if (key === 'l' || key === 'low' || key === 'baixa') return { score: 20, className: 'baixa' };
+  if (key === 'l' || key === 'low' || key === 'baixa') return { score: 20, className: 'low' };
 
   const number = Number(value);
   if (Number.isFinite(number)) {
-    if (number >= 80) return { score: number, className: 'alta' };
+    if (number >= 80) return { score: number, className: 'high' };
     if (number >= 30) return { score: number, className: 'nominal' };
-    return { score: number, className: 'baixa' };
+    return { score: number, className: 'low' };
   }
-  return { score: null, className: 'baixa' };
+  return { score: null, className: 'low' };
 }
 
 function qaFlag(record) {
@@ -125,7 +125,8 @@ export function normalizeFirmsRecord(record, {
   if (!confidence.score || confidence.score < minConfidence) {
     return { skipped: 'confidence' };
   }
-  const viirsMinScore = viirsMinClass === 'alta' ? 90 : viirsMinClass === 'baixa' ? 20 : 60;
+  // Accepts the English class names and the legacy Portuguese ones (alta/baixa) for old env files.
+  const viirsMinScore = viirsMinClass === 'high' || viirsMinClass === 'alta' ? 90 : viirsMinClass === 'low' || viirsMinClass === 'baixa' ? 20 : 60;
   if (sensor === 'VIIRS' && confidence.score < viirsMinScore) {
     return { skipped: 'confidence' };
   }

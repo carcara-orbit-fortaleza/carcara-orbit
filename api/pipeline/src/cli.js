@@ -21,7 +21,7 @@ import { fetchCurrentHotspots, refreshRealData } from './nrt/refresh.js';
 import { runGlobalIngestion } from './global/ingest.js';
 
 const HELP = `
-CarcarÃ¡ pipeline worker
+Carcará pipeline worker
 
 Usage:
   node pipeline/src/cli.js pipeline --input <csv-file-or-directory> [--out <directory>] [--json]
@@ -562,9 +562,9 @@ async function commandStatus(values) {
   console.log(`NRT enabled: ${status.nrt.enabled ? 'yes' : 'no'}`);
   console.log(`FIRMS key: ${status.nrt.keyConfigured ? 'configured' : 'missing'}`);
   if (stored) {
-    console.log(`NRT last run: ${stored.lastRun ?? 'â€”'}`);
-    console.log(`NRT last success: ${stored.lastSuccess ?? 'â€”'}`);
-    console.log(`NRT last error: ${stored.lastError?.message ?? 'â€”'}`);
+    console.log(`NRT last run: ${stored.lastRun ?? '—'}`);
+    console.log(`NRT last success: ${stored.lastSuccess ?? '—'}`);
+    console.log(`NRT last error: ${stored.lastError?.message ?? '—'}`);
   }
 }
 

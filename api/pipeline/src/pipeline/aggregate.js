@@ -1,8 +1,8 @@
-import { compareMonth, MONTHS_PT, MONTHS_PT_LONG, monthLabel } from '../lib/dates.js';
+import { compareMonth, MONTHS_LONG, MONTHS_SHORT, monthLabel } from '../lib/dates.js';
 import { featureCollection } from '../lib/geo.js';
 import { clamp, linearRegressionSlope, mean, median, percentileRange, round, sum } from '../lib/stats.js';
 
-const numberFormat = new Intl.NumberFormat('pt-BR');
+const numberFormat = new Intl.NumberFormat('en-US');
 
 function formatNumber(value) {
   return numberFormat.format(Math.round(value ?? 0));
@@ -10,7 +10,7 @@ function formatNumber(value) {
 
 function signed(value) {
   if (!Number.isFinite(value)) return '—';
-  return `${value > 0 ? '+' : ''}${value.toFixed(1).replace('.', ',')}`;
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`;
 }
 
 function coverageOf(clusters) {
@@ -96,7 +96,7 @@ function annualSeries(years, counts, baselineStart, baselineEnd, baselineMeanAnn
 }
 
 function climatology(years, counts, baselineStart, baselineEnd) {
-  return MONTHS_PT.map((label, index) => {
+  return MONTHS_SHORT.map((label, index) => {
     const month = index + 1;
     const values = [];
     years.forEach((year, yearIndex) => {
@@ -131,7 +131,7 @@ function fireSeason(climatologyData) {
   });
   return {
     peak_month: peakIndex + 1,
-    peak_label: MONTHS_PT[peakIndex],
+    peak_label: MONTHS_SHORT[peakIndex],
     start_month: activeMonths[0] ?? null,
     end_month: activeMonths[activeMonths.length - 1] ?? null,
     active_months: activeMonths,
@@ -142,24 +142,24 @@ function fireSeason(climatologyData) {
 function buildInsights(metrics, season, climatologyData) {
   const insights = [];
   if (metrics.peak_year !== null) {
-    insights.push(`Pico histórico em ${metrics.peak_year}, com ${formatNumber(metrics.peak_year_total)} focos harmonizados.`);
+    insights.push(`Historical peak in ${metrics.peak_year}, with ${formatNumber(metrics.peak_year_total)} harmonized hotspots.`);
   }
   if (season.peak_month) {
-    insights.push(`Estação crítica de ${MONTHS_PT_LONG[(season.start_month ?? season.peak_month) - 1]} a ${MONTHS_PT_LONG[(season.end_month ?? season.peak_month) - 1]}, com pico em ${MONTHS_PT_LONG[season.peak_month - 1]}.`);
+    insights.push(`Critical season from ${MONTHS_LONG[(season.start_month ?? season.peak_month) - 1]} to ${MONTHS_LONG[(season.end_month ?? season.peak_month) - 1]}, peaking in ${MONTHS_LONG[season.peak_month - 1]}.`);
   }
   if (metrics.current_year_anomaly_pct !== null && Number.isFinite(metrics.current_year_anomaly_pct)) {
-    const direction = metrics.current_year_anomaly_pct >= 0 ? 'acima' : 'abaixo';
-    insights.push(`${metrics.current_year} (${metrics.current_year_months} meses) está ${Math.abs(metrics.current_year_anomaly_pct).toFixed(1).replace('.', ',')}% ${direction} da média ${metrics.baseline_years}.`);
+    const direction = metrics.current_year_anomaly_pct >= 0 ? 'above' : 'below';
+    insights.push(`${metrics.current_year} (${metrics.current_year_months} months) is ${Math.abs(metrics.current_year_anomaly_pct).toFixed(1)}% ${direction} the ${metrics.baseline_years} average.`);
   } else if (metrics.trend_pct_decade !== null && Number.isFinite(metrics.trend_pct_decade)) {
-    insights.push(`Tendência de ${signed(metrics.trend_pct_decade)}% por década na série harmonizada.`);
+    insights.push(`${metrics.trend_pct_decade >= 0 ? 'Upward' : 'Downward'} trend of ${Math.abs(metrics.trend_pct_decade).toFixed(1)}% per decade in the harmonized series.`);
   }
   if (insights.length === 0) {
-    insights.push('Ainda não há dados suficientes para gerar insights.');
+    insights.push('Not enough data yet to generate insights.');
   }
   if (insights.length < 3 && climatologyData.some((entry) => entry.mean !== null)) {
     const peak = climatologyData.reduce((best, entry) => (entry.mean !== null && (!best || entry.mean > best.mean) ? entry : best), null);
     if (peak) {
-      insights.push(`O mês com maior média histórica é ${MONTHS_PT_LONG[peak.month - 1]}, com ${formatNumber(peak.mean)} focos.`);
+      insights.push(`The month with the highest historical average is ${MONTHS_LONG[peak.month - 1]}, with ${formatNumber(peak.mean)} hotspots.`);
     }
   }
   return insights.slice(0, 3);
@@ -214,7 +214,7 @@ export function aggregateDataset(clusters, {
   warnings = [],
   maxMapPoints = 2000,
   precomputed = null,
-  disclaimer = 'Dados derivados de focos ativos NASA FIRMS/Earthdata. Uso informativo; não substitui validação oficial.',
+  disclaimer = 'Data derived from NASA FIRMS/Earthdata active fire hotspots. For information only; does not replace official validation.',
   license = 'NASA FIRMS/Earthdata. Attribution required.',
 } = {}) {
   const baselineStart = baseline.startYear ?? 2003;
@@ -413,7 +413,7 @@ export function aggregateDataset(clusters, {
         calibration_window: calibration?.calibration_window ?? null,
         factor_by_region: calibrationSummary.factor_by_region ?? 1,
         uncertainty_pct: calibrationSummary.uncertainty_pct ?? 100,
-        confidence: calibrationSummary.confidence ?? 'baixa',
+        confidence: calibrationSummary.confidence ?? 'low',
       },
       sensor_coverage: {
         modis: totalModisRaw,
@@ -433,7 +433,7 @@ export function aggregateDataset(clusters, {
     if (!hasRegionData) {
       allWarnings.push(`${region.id}: no hotspots in the input; all calendar cells are null.`);
     }
-    if (calibrationSummary.confidence === 'baixa') {
+    if (calibrationSummary.confidence === 'low') {
       allWarnings.push(`${region.id}: low-confidence calibration; treat factors as provisional.`);
     }
 
@@ -474,7 +474,7 @@ export function aggregateDataset(clusters, {
 
   const meta = {
     project: 'Carcará Orbit',
-    dataset: 'Calendário harmonizado de atividade de queimadas',
+    dataset: 'Harmonized fire activity calendar',
     version: 'firms-1.0',
     generated_at: generatedAt,
     period: globalCoverage
@@ -495,7 +495,7 @@ export function aggregateDataset(clusters, {
   return {
     calendar: {
       meta,
-      months: MONTHS_PT,
+      months: MONTHS_SHORT,
       years,
       baseline_years: baselineYears,
       regions: regionsOut,

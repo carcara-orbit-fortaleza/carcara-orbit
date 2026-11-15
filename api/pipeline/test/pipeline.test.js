@@ -57,7 +57,7 @@ test('calibrateFactors falls back to factor 1 without overlap', () => {
     calibration: { startYear: 2012, endYear: 2025, minCells: 30, shrinkageK: 20, minFactor: 0.5, maxFactor: 4 },
   });
   assert.equal(calibration.factors.pantanal[1].factor, 1);
-  assert.equal(calibration.factors.pantanal[1].confidence, 'baixa');
+  assert.equal(calibration.factors.pantanal[1].confidence, 'low');
 });
 
 test('clusterHotspots merges nearby detections and keeps far ones separate', () => {
@@ -65,9 +65,9 @@ test('clusterHotspots merges nearby detections and keeps far ones separate', () 
     sensor: 'MODIS',
     platform: 'Terra',
     region_id: 'pantanal',
-    biome: 'Área úmida',
+    biome: 'Wetland',
     confidence: 80,
-    confidence_class: 'alta',
+    confidence_class: 'high',
     brightness_k: 330,
     frp_mw: 10,
     daynight: 'D',

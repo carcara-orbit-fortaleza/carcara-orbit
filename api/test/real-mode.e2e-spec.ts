@@ -74,7 +74,7 @@ describe('Real-data mode and exports (e2e)', () => {
       .expect((res) => {
         const text = res.text;
         expect(text.charCodeAt(0)).toBe(0xfeff);
-        expect(text).toContain('lat;lon;date;ts_utc');
+        expect(text).toContain('lat,lon,date,ts_utc');
         const lines = text.trim().split(/\r?\n/);
         expect(lines.length).toBeGreaterThan(1);
       });

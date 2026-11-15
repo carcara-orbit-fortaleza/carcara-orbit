@@ -14,7 +14,7 @@ export class ExportController {
     @Res({ passthrough: true }) res: Response,
   ): string {
     if (!region) {
-      throw new BadRequestException('region é obrigatório');
+      throw new BadRequestException('region is required');
     }
     const { filename, body } = this.exporter.buildCsv(region, from, to);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

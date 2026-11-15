@@ -24,7 +24,7 @@ export function parseYearRange(from: unknown, to: unknown): { from: number; to: 
   const start = parseYear(from, 'from', FIRST_YEAR);
   const end = parseYear(to, 'to', LAST_YEAR);
   if (start > end) {
-    throw new BadRequestException('from não pode ser maior que to');
+    throw new BadRequestException('from cannot be greater than to');
   }
   return { from: start, to: end };
 }
@@ -46,7 +46,7 @@ export function parseBbox(value: unknown): [number, number, number, number] | un
     parts[3] <= 90;
   if (!valid) {
     throw new BadRequestException(
-      'bbox deve ser oeste,sul,leste,norte com valores de longitude e latitude válidos',
+      'bbox must be west,south,east,north with valid longitude and latitude values',
     );
   }
   return parts as [number, number, number, number];

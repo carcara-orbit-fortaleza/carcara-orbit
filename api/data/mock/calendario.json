@@ -1,7 +1,7 @@
 {
  "meta": {
   "project": "Carcará Orbit",
-  "dataset": "Calendário harmonizado de atividade de queimadas",
+  "dataset": "Harmonized fire activity calendar",
   "version": "mock-1.0",
   "generated_at": "2026-11-11T13:25:44.233065+00:00",
   "period": {
@@ -34,22 +34,22 @@
     "overpass": "01:30 / 13:30 local"
    }
   ],
-  "disclaimer": "DADOS SINTÉTICOS PARA DEMONSTRAÇÃO. Não representam focos reais e não devem ser usados para decisão operacional.",
-  "license": "CC BY 4.0 (mock) — dados reais: NASA FIRMS / Earthdata"
+  "disclaimer": "SYNTHETIC DATA FOR DEMONSTRATION. Does not represent real hotspots and must not be used for operational decisions.",
+  "license": "CC BY 4.0 (mock) — real data: NASA FIRMS / Earthdata"
  },
  "months": [
   "Jan",
-  "Fev",
+  "Feb",
   "Mar",
-  "Abr",
-  "Mai",
+  "Apr",
+  "May",
   "Jun",
   "Jul",
-  "Ago",
-  "Set",
-  "Out",
+  "Aug",
+  "Sep",
+  "Oct",
   "Nov",
-  "Dez"
+  "Dec"
  ],
  "years": [
   2000,
@@ -108,9 +108,9 @@
  "regions": [
   {
    "id": "amazonia",
-   "name": "Amazônia",
+   "name": "Amazon",
    "short": "AMZ",
-   "biome": "Floresta tropical",
+   "biome": "Tropical forest",
    "area_km2": 4196943,
    "center": [
     -62.0,
@@ -176,7 +176,7 @@
    "id": "cerrado",
    "name": "Cerrado",
    "short": "CER",
-   "biome": "Savana tropical",
+   "biome": "Tropical savanna",
    "area_km2": 2036448,
    "center": [
     -49.0,
@@ -222,7 +222,7 @@
    "id": "pantanal",
    "name": "Pantanal",
    "short": "PAN",
-   "biome": "Área úmida",
+   "biome": "Wetland",
    "area_km2": 150355,
    "center": [
     -57.0,
@@ -260,7 +260,7 @@
    "id": "caatinga",
    "name": "Caatinga",
    "short": "CAA",
-   "biome": "Floresta seca",
+   "biome": "Dry forest",
    "area_km2": 844453,
    "center": [
     -41.0,
@@ -296,9 +296,9 @@
   },
   {
    "id": "mata-atlantica",
-   "name": "Mata Atlântica",
+   "name": "Atlantic Forest",
    "short": "MAT",
-   "biome": "Floresta costeira",
+   "biome": "Coastal forest",
    "area_km2": 1110182,
    "center": [
     -44.0,
@@ -348,7 +348,7 @@
    "id": "pampa",
    "name": "Pampa",
    "short": "PAM",
-   "biome": "Campo subtropical",
+   "biome": "Subtropical grassland",
    "area_km2": 176496,
    "center": [
     -54.0,
@@ -12024,7 +12024,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 556.1,
      "p05": 404.0,
      "p95": 728.0,
@@ -12040,7 +12040,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 518.3,
      "p05": 400.3,
      "p95": 717.1,
@@ -12048,7 +12048,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 680.0,
      "p05": 481.6,
      "p95": 904.9,
@@ -12072,7 +12072,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 3120.1,
      "p05": 2224.5,
      "p95": 4155.2,
@@ -12080,7 +12080,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 4449.5,
      "p05": 3387.0,
      "p95": 6209.8,
@@ -12088,7 +12088,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 3815.7,
      "p05": 2748.6,
      "p95": 5311.3,
@@ -12104,7 +12104,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 996,
      "p05": 737.0,
      "p95": 1225.0,
@@ -12113,7 +12113,7 @@
    ],
    "season": {
     "peak_month": 9,
-    "peak_label": "Set",
+    "peak_label": "Sep",
     "start_month": 8,
     "end_month": 10,
     "active_months": [
@@ -12354,7 +12354,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 296.3,
      "p05": 213.8,
      "p95": 356.6,
@@ -12370,7 +12370,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 307.4,
      "p05": 250.7,
      "p95": 412.3,
@@ -12378,7 +12378,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 406.5,
      "p05": 327.0,
      "p95": 527.4,
@@ -12402,7 +12402,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 3753,
      "p05": 2854.1,
      "p95": 4899.0,
@@ -12410,7 +12410,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 3810.3,
      "p05": 2906.7,
      "p95": 4731.0,
@@ -12418,7 +12418,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 2688.3,
      "p05": 2174.3,
      "p95": 3300.4,
@@ -12434,7 +12434,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 503.7,
      "p05": 406.5,
      "p95": 651.8,
@@ -12443,7 +12443,7 @@
    ],
    "season": {
     "peak_month": 9,
-    "peak_label": "Set",
+    "peak_label": "Sep",
     "start_month": 8,
     "end_month": 10,
     "active_months": [
@@ -12684,7 +12684,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 172.0,
      "p05": 110.8,
      "p95": 363.8,
@@ -12700,7 +12700,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 121.2,
      "p05": 77.6,
      "p95": 239.2,
@@ -12708,7 +12708,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 164.7,
      "p05": 91.7,
      "p95": 388.1,
@@ -12732,7 +12732,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 1034.3,
      "p05": 753.0,
      "p95": 1707.2,
@@ -12740,7 +12740,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 1645.2,
      "p05": 1116.9,
      "p95": 3199.8,
@@ -12748,7 +12748,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 1347.3,
      "p05": 884.7,
      "p95": 3020.9,
@@ -12764,7 +12764,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 229.7,
      "p05": 159.9,
      "p95": 501.4,
@@ -12773,7 +12773,7 @@
    ],
    "season": {
     "peak_month": 9,
-    "peak_label": "Set",
+    "peak_label": "Sep",
     "start_month": 8,
     "end_month": 10,
     "active_months": [
@@ -13014,7 +13014,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 57.8,
      "p05": 48.1,
      "p95": 71.3,
@@ -13030,7 +13030,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 71.3,
      "p05": 54.4,
      "p95": 97.3,
@@ -13038,7 +13038,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 92.7,
      "p05": 75.3,
      "p95": 125.5,
@@ -13062,7 +13062,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 225.1,
      "p05": 191.7,
      "p95": 275.7,
@@ -13070,7 +13070,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 342.2,
      "p05": 274.2,
      "p95": 444.9,
@@ -13078,7 +13078,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 462.8,
      "p05": 359.0,
      "p95": 586.7,
@@ -13094,7 +13094,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 269.0,
      "p05": 209.3,
      "p95": 344.4,
@@ -13345,7 +13345,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 45.7,
      "p05": 33.1,
      "p95": 56.8,
@@ -13361,7 +13361,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 46.3,
      "p05": 34.2,
      "p95": 56.0,
@@ -13369,7 +13369,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 57.4,
      "p05": 38.2,
      "p95": 72.8,
@@ -13393,7 +13393,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 123.6,
      "p05": 96.0,
      "p95": 142.9,
@@ -13401,7 +13401,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 187,
      "p05": 132.0,
      "p95": 236.8,
@@ -13409,7 +13409,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 228.3,
      "p05": 162.9,
      "p95": 295.3,
@@ -13425,7 +13425,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 74.5,
      "p05": 60.1,
      "p95": 94.3,
@@ -13434,7 +13434,7 @@
    ],
    "season": {
     "peak_month": 10,
-    "peak_label": "Out",
+    "peak_label": "Oct",
     "start_month": 8,
     "end_month": 11,
     "active_months": [
@@ -13676,7 +13676,7 @@
     },
     {
      "month": 2,
-     "label": "Fev",
+     "label": "Feb",
      "mean": 109.8,
      "p05": 87.1,
      "p95": 140.3,
@@ -13692,7 +13692,7 @@
     },
     {
      "month": 4,
-     "label": "Abr",
+     "label": "Apr",
      "mean": 53.5,
      "p05": 44.3,
      "p95": 59.9,
@@ -13700,7 +13700,7 @@
     },
     {
      "month": 5,
-     "label": "Mai",
+     "label": "May",
      "mean": 34.4,
      "p05": 28.1,
      "p95": 40.0,
@@ -13724,7 +13724,7 @@
     },
     {
      "month": 8,
-     "label": "Ago",
+     "label": "Aug",
      "mean": 31.3,
      "p05": 26.1,
      "p95": 38.0,
@@ -13732,7 +13732,7 @@
     },
     {
      "month": 9,
-     "label": "Set",
+     "label": "Sep",
      "mean": 40.3,
      "p05": 33.1,
      "p95": 49.7,
@@ -13740,7 +13740,7 @@
     },
     {
      "month": 10,
-     "label": "Out",
+     "label": "Oct",
      "mean": 54.2,
      "p05": 40.3,
      "p95": 63.8,
@@ -13756,7 +13756,7 @@
     },
     {
      "month": 12,
-     "label": "Dez",
+     "label": "Dec",
      "mean": 114.5,
      "p05": 91.8,
      "p95": 139.0,
@@ -13782,8 +13782,8 @@
  "metrics": {
   "amazonia": {
    "region_id": "amazonia",
-   "region_name": "Amazônia",
-   "biome": "Floresta tropical",
+   "region_name": "Amazon",
+   "biome": "Tropical forest",
    "area_km2": 4196943,
    "period": {
     "start": "2000-01",
@@ -13815,13 +13815,13 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.71,
     "uncertainty_pct": 8,
-    "confidence": "alta"
+    "confidence": "high"
    }
   },
   "cerrado": {
    "region_id": "cerrado",
    "region_name": "Cerrado",
-   "biome": "Savana tropical",
+   "biome": "Tropical savanna",
    "area_km2": 2036448,
    "period": {
     "start": "2000-01",
@@ -13853,13 +13853,13 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.62,
     "uncertainty_pct": 9,
-    "confidence": "alta"
+    "confidence": "high"
    }
   },
   "pantanal": {
    "region_id": "pantanal",
    "region_name": "Pantanal",
-   "biome": "Área úmida",
+   "biome": "Wetland",
    "area_km2": 150355,
    "period": {
     "start": "2000-01",
@@ -13891,13 +13891,13 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.84,
     "uncertainty_pct": 11,
-    "confidence": "alta"
+    "confidence": "high"
    }
   },
   "caatinga": {
    "region_id": "caatinga",
    "region_name": "Caatinga",
-   "biome": "Floresta seca",
+   "biome": "Dry forest",
    "area_km2": 844453,
    "period": {
     "start": "2000-01",
@@ -13929,13 +13929,13 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.55,
     "uncertainty_pct": 12,
-    "confidence": "média"
+    "confidence": "medium"
    }
   },
   "mata-atlantica": {
    "region_id": "mata-atlantica",
-   "region_name": "Mata Atlântica",
-   "biome": "Floresta costeira",
+   "region_name": "Atlantic Forest",
+   "biome": "Coastal forest",
    "area_km2": 1110182,
    "period": {
     "start": "2000-01",
@@ -13967,13 +13967,13 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.48,
     "uncertainty_pct": 10,
-    "confidence": "média"
+    "confidence": "medium"
    }
   },
   "pampa": {
    "region_id": "pampa",
    "region_name": "Pampa",
-   "biome": "Campo subtropical",
+   "biome": "Subtropical grassland",
    "area_km2": 176496,
    "period": {
     "start": "2000-01",
@@ -14005,37 +14005,37 @@
     "calibration_window": "2012–2025",
     "factor_by_region": 1.42,
     "uncertainty_pct": 13,
-    "confidence": "média"
+    "confidence": "medium"
    }
   }
  },
  "insights": {
   "amazonia": [
-   "O acumulado de 2026 (jan–out) está dentro da faixa histórica (+19%).",
-   "O pico sazonal ocorre em Set, quando se concentra 22% da atividade anual.",
-   "Tendência de alta de 8.3% por década na série harmonizada."
+   "The 2026 total (Jan–Oct) is within the historical range (+19%).",
+   "The seasonal peak occurs in Sep, when 22% of annual activity is concentrated.",
+   "Upward trend of 8.3% per decade in the harmonized series."
   ],
   "cerrado": [
-   "O acumulado de 2026 (jan–out) está 43% acima da média histórica do mesmo período.",
-   "O pico sazonal ocorre em Set, quando se concentra 24% da atividade anual."
+   "The 2026 total (Jan–Oct) is 43% above the historical average for the same period.",
+   "The seasonal peak occurs in Sep, when 24% of annual activity is concentrated."
   ],
   "pantanal": [
-   "O acumulado de 2026 (jan–out) está 43% acima da média histórica do mesmo período.",
-   "O pico sazonal ocorre em Set, quando se concentra 26% da atividade anual.",
-   "Tendência de alta de 32.6% por década na série harmonizada."
+   "The 2026 total (Jan–Oct) is 43% above the historical average for the same period.",
+   "The seasonal peak occurs in Sep, when 26% of annual activity is concentrated.",
+   "Upward trend of 32.6% per decade in the harmonized series."
   ],
   "caatinga": [
-   "O acumulado de 2026 (jan–out) está dentro da faixa histórica (+0%).",
-   "O pico sazonal ocorre em Nov, quando se concentra 22% da atividade anual."
+   "The 2026 total (Jan–Oct) is within the historical range (+0%).",
+   "The seasonal peak occurs in Nov, when 22% of annual activity is concentrated."
   ],
   "mata-atlantica": [
-   "O acumulado de 2026 (jan–out) está 28% abaixo da média histórica do mesmo período.",
-   "O pico sazonal ocorre em Out, quando se concentra 19% da atividade anual.",
-   "Tendência de queda de 14.9% por década na série harmonizada."
+   "The 2026 total (Jan–Oct) is 28% below the historical average for the same period.",
+   "The seasonal peak occurs in Oct, when 19% of annual activity is concentrated.",
+   "Downward trend of 14.9% per decade in the harmonized series."
   ],
   "pampa": [
-   "O acumulado de 2026 (jan–out) está dentro da faixa histórica (+9%).",
-   "O pico sazonal ocorre em Jan, quando se concentra 16% da atividade anual."
+   "The 2026 total (Jan–Oct) is within the historical range (+9%).",
+   "The seasonal peak occurs in Jan, when 16% of annual activity is concentrated."
   ]
  }
 }

@@ -3,20 +3,20 @@ import { CalendarService } from '../calendar/calendar.service.js';
 import { GeoFeature } from '../data/mock-data.service.js';
 import { HotspotsService } from '../hotspots/hotspots.service.js';
 
-const SEPARATOR = ';';
+const SEPARATOR = ',';
 const BOM = '﻿';
 const HEADER = [
-  'regiao',
-  'bioma',
-  'ano',
-  'mes',
-  'focos_harmonizados',
-  'anomalia_pct',
-  'focos_modis_brutos',
-  'focos_viirs_brutos',
-  'share_viirs_pct',
-  'metodo',
-  'origem',
+  'region',
+  'biome',
+  'year',
+  'month',
+  'harmonized_hotspots',
+  'anomaly_pct',
+  'modis_raw_hotspots',
+  'viirs_raw_hotspots',
+  'viirs_share_pct',
+  'method',
+  'source',
 ];
 
 const HOTSPOT_HEADER = [
@@ -49,14 +49,14 @@ export class ExportService {
   ) {}
 
   /**
-   * CSV do calendário mensal de uma região. Usa UTF-8 com BOM e separador `;`
-   * para abrir direto no Excel em pt-BR. Meses sem dado (null) não viram zero.
+   * Monthly calendar CSV for one region. UTF-8 with BOM and `,` separator.
+   * Months without data (null) are left empty, not zero.
    */
   buildCsv(regionId: string, from?: unknown, to?: unknown) {
     const result = this.calendar.getCalendar(regionId, from, to);
     const rawMethod = result.meta.method_version;
     const method = typeof rawMethod === 'string' ? rawMethod : '';
-    const origin = result.mode === 'real' ? 'NASA FIRMS (dados reais)' : 'dados sinteticos (mock)';
+    const origin = result.mode === 'real' ? 'NASA FIRMS (real data)' : 'synthetic data (mock)';
     const lines: string[] = [HEADER.join(SEPARATOR)];
 
     result.years.forEach((year, yi) => {
@@ -87,7 +87,7 @@ export class ExportService {
 
   /**
    * CSV of hotspots filtered by the same search parameters as /api/hotspots.
-   * UTF-8 BOM and `;` keep it Excel-friendly; empty values stay empty.
+   * UTF-8 BOM and `,` separator; empty values stay empty.
    */
   buildHotspotsCsv(params: {
     region?: string;
@@ -139,5 +139,5 @@ export class ExportService {
 
 function decimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return '';
-  return value.toFixed(1).replace('.', ',');
+  return value.toFixed(1);
 }

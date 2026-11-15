@@ -68,7 +68,7 @@ export class MockDataService {
       return JSON.parse(readFileSync(join(dir, file), 'utf8')) as T;
     } catch {
       throw new InternalServerErrorException(
-        `Não foi possível ler o arquivo de dados mock ${file} em ${dir}`,
+        `Could not read mock data file ${file} in ${dir}`,
       );
     }
   }

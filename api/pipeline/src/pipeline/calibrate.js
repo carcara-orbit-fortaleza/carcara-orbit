@@ -64,14 +64,14 @@ function computeCalibration({
       });
       const uncertaintyPct = ratios.length > 0 ? ci.uncertaintyPct : 100;
       const confidence = ratios.length >= minCells && uncertaintyPct <= 20
-        ? 'alta'
+        ? 'high'
         : ratios.length >= minCells
-          ? 'média'
-          : 'baixa';
+          ? 'medium'
+          : 'low';
 
       if (ratios.length > 0) monthsWithRatios += 1;
-      if (confidence === 'alta') highConfidenceMonths += 1;
-      if (confidence !== 'baixa') mediumOrBetterMonths += 1;
+      if (confidence === 'high') highConfidenceMonths += 1;
+      if (confidence !== 'low') mediumOrBetterMonths += 1;
 
       factors[region.id][month] = {
         factor: Math.round(factor * 1000) / 1000,
@@ -85,10 +85,10 @@ function computeCalibration({
     }
 
     const overallConfidence = highConfidenceMonths >= 8
-      ? 'alta'
+      ? 'high'
       : mediumOrBetterMonths >= 6
-        ? 'média'
-        : 'baixa';
+        ? 'medium'
+        : 'low';
     const monthlyUncertainties = Object.values(factors[region.id])
       .map((entry) => entry.uncertainty_pct)
       .filter((value) => Number.isFinite(value));

@@ -99,7 +99,7 @@ describe('API (e2e)', () => {
     return request(app.getHttpServer()).get('/api/global/regions').expect(503);
   });
 
-  it('GET /api/export.csv returns a BOM, semicolons and 322 rows for the full series', () => {
+  it('GET /api/export.csv returns a BOM, commas and 322 rows for the full series', () => {
     return request(app.getHttpServer())
       .get('/api/export.csv?region=cerrado')
       .expect(200)
@@ -108,7 +108,7 @@ describe('API (e2e)', () => {
         const text = res.text;
         expect(text.charCodeAt(0)).toBe(0xfeff);
         const lines = text.trim().split(/\r?\n/);
-        expect(lines[0]).toContain(';');
+        expect(lines[0]).toContain(',');
         expect(lines.length - 1).toBe(322);
       });
   });

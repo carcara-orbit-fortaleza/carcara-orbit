@@ -49,7 +49,7 @@ test('normalizeFirmsCsv keeps valid VIIRS rows and normalizes confidence', () =>
   assert.equal(result.hotspots.length, 14);
   assert.equal(result.stats.skippedConfidence, 0);
   assert.ok(result.hotspots.every((hotspot) => hotspot.sensor === 'VIIRS'));
-  assert.ok(result.hotspots.every((hotspot) => ['baixa', 'nominal', 'alta'].includes(hotspot.confidence_class)));
+  assert.ok(result.hotspots.every((hotspot) => ['low', 'nominal', 'high'].includes(hotspot.confidence_class)));
 });
 
 test('normalizeFirmsCsv accepts single-letter VIIRS confidence codes', () => {
@@ -62,7 +62,7 @@ test('normalizeFirmsCsv accepts single-letter VIIRS confidence codes', () => {
   const result = normalizeFirmsCsv(csv, { regions, sensor: 'VIIRS', viirsMinClass: 'nominal' });
   assert.equal(result.hotspots.length, 2);
   assert.equal(result.stats.skippedConfidence, 1);
-  assert.deepEqual(result.hotspots.map((hotspot) => hotspot.confidence_class).sort(), ['alta', 'nominal']);
+  assert.deepEqual(result.hotspots.map((hotspot) => hotspot.confidence_class).sort(), ['high', 'nominal']);
 });
 
 test('normalizeFirmsCsv filters low-confidence MODIS rows', () => {

@@ -352,18 +352,18 @@ function statusText(input: {
   hotspotsLoading: boolean
   hotspotsError: string | null
 }): string {
-  if (input.hotspotsLoading) return 'Carregando focos em /api/hotspots…'
+  if (input.hotspotsLoading) return 'Carregando focos globais…'
   if (input.hotspotsError) return input.hotspotsError
   if (input.drawing) {
     return input.vertices < 3
       ? `Desenho em andamento, ${input.vertices} ${input.vertices === 1 ? 'vértice' : 'vértices'}. Marque pelo menos três.`
       : `Desenho em andamento, ${input.vertices} vértices. Feche no primeiro ponto ou em Fechar polígono.`
   }
-  if (input.empty) return 'O polígono não cruza os biomas da série. O calendário fica sem dado nesse recorte.'
+  if (input.empty) return 'O polígono não cruza as células da série. O calendário fica sem dado nesse recorte.'
   if (input.polygon && input.area !== null) {
     return `${input.inside.toLocaleString('pt-BR')} de ${input.total.toLocaleString('pt-BR')} focos dentro do polígono · ${formatArea(input.area)}.`
   }
-  return `Sem recorte livre. ${input.total.toLocaleString('pt-BR')} focos na amostra; o bioma escolhido segue em destaque.`
+  return `Sem recorte livre. ${input.total.toLocaleString('pt-BR')} focos na amostra; a célula escolhida segue em destaque.`
 }
 
 function toLatLngs(ring: LonLat[]): L.LatLngExpression[] {

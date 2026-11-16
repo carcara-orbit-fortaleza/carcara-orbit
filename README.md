@@ -31,10 +31,11 @@ e deploy por SSH na VPS.
   são relativas e passam pelo nginx do serviço `web`, que encaminha `/api/*` para
   `api:3000` na rede interna do Docker. A API **não** é publicada no host.
 - **Dados:** o globo da home e o painel consomem a trilha global
-  (`/api/global/hotspots`, `/api/global/regions`, `/api/global/calendar`), cujo
-  SQLite vive em `data/db/global.sqlite`. Os endpoints `/api/hotspots`,
-  `/api/regions` e `/api/calendar` continuam disponíveis para a trilha Brasil
-  legada, controlada por `DATA_SOURCE`.
+  (`/api/global/hotspots`, `/api/global/aggregates`). O calendário vem do
+  agregado `data/db/aggregates.sqlite`; o SQLite linha a linha
+  (`data/db/global.sqlite`) atende os endpoints legados. Os endpoints
+  `/api/hotspots`, `/api/regions` e `/api/calendar` continuam disponíveis para
+  a trilha Brasil legada, controlada por `DATA_SOURCE`.
 - Os cookies de sessão do painel funcionam nos dois modos (CORS com credenciais em dev,
   mesma origem em produção).
 
@@ -59,15 +60,24 @@ docker compose up --build
 
 O Compose de desenvolvimento usa bind mount e hot reload nos dois serviços. O
 entrypoint da API aplica as migrações do Postgres automaticamente. O globo e o
-painel usam a trilha global; para popular o SQLite no dev, rode um piloto:
+painel usam a trilha global; para popular os dados no dev:
 
 ```bash
+# 1. baixa os CSVs históricos (piloto)
 docker compose exec -T api npm run global -- --countries all --max-files 20 --grid 10
+
+# 2. gera o agregado com DuckDB (ver docs/GLOBAL.md)
+docker run --rm --ulimit nofile=65536:65536 \
+  -v carcara-orbit_api_data:/data \
+  -v "$PWD/api/scripts:/scripts:ro" \
+  python:3.12-slim \
+  sh -c 'pip install --quiet duckdb && python /scripts/global_aggregate.py \
+    --raw /data/raw/global --regions /data/runtime/global-regions.json \
+    --out /data/db/aggregates.sqlite --tmp /data/db/duckdb-tmp'
 ```
 
-Sem esse piloto, o globo mantém a demonstração e o painel informa que a grade
-global ainda não tem dados. `DATA_SOURCE=mock` afeta apenas os endpoints
-legados do Brasil.
+Sem o agregado, o painel informa que a grade global ainda não tem dados.
+`DATA_SOURCE=mock` afeta apenas os endpoints legados do Brasil.
 
 ### Postgres
 
@@ -100,11 +110,12 @@ O diretório `api/data` é o volume de trabalho do pipeline (`raw`, `real`, `db`
 A API possui uma trilha global separada do dataset Brasil usado pela web:
 
 - baixa o histórico mundial da FIRMS (238 países, ~10 mil CSVs, ~43,5 GB);
-- importa para `data/db/global.sqlite`, com checkpoint e retomada;
+- agrega os CSVs com DuckDB em `data/db/aggregates.sqlite` (célula × ano × mês ×
+  sensor, calibração e amostra recente), sem importar 1 bilhão de linhas;
 - atribui cada foco a uma grade mundial (padrão 10°, 648 células);
-- calcula clusters e calibração VIIRS/MODIS por célula/mês;
-- expõe calendário, focos e CSV para qualquer célula ou bbox em `/api/global/*`;
-- opcionalmente busca o NRT atual em tiles globais (`FIRMS_MAP_KEY`).
+- expõe o agregado completo, focos e CSV em `/api/global/*`;
+- usa a disponibilidade do FIRMS para saber o ano corrente (NRT);
+- opcionalmente mantém a trilha linha a linha legada em `global.sqlite`.
 
 ```bash
 # Plano (não baixa)
@@ -113,8 +124,8 @@ docker compose exec api npm run global -- --dry-run --countries all --grid 10
 # Piloto com 20 arquivos
 docker compose exec api npm run global -- --countries all --max-files 20
 
-# Carga completa + NRT atual
-docker compose exec api npm run global -- --countries all --current
+# Carga histórica completa (depois rode o agregado DuckDB)
+docker compose exec api npm run global -- --countries all
 ```
 
 Endpoints principais:
@@ -122,7 +133,8 @@ Endpoints principais:
 | Rota | Descrição |
 | --- | --- |
 | `GET /api/global/status` | cobertura, grade, calibração e status do job |
-| `GET /api/global/calendar?region=&bbox=&from=&to=` | calendário global harmonizado |
+| `GET /api/global/aggregates` | agregado harmonizado de todas as células |
+| `GET /api/global/calendar?region=&bbox=&from=&to=` | calendário global harmonizado (legado) |
 | `GET /api/global/hotspots?region=&bbox=&from=&to=&sensor=` | focos globais |
 | `GET /api/global/export/hotspots.csv?...` | CSV global |
 | `POST /api/global/ingest` | dispara a ingestão em background (admin) |
@@ -150,9 +162,10 @@ compartilhada. O nginx serve os assets da SPA e faz proxy de `/api` para o
 serviço `api`, que permanece inacessível diretamente pela internet. O Postgres
 não publica porta no host e roda com backup diário.
 
-Os dados do globo e do painel vêm da trilha global (`data/db/global.sqlite`),
-carregada com `npm run global` e persistida no volume `api_data`. O runbook
-está em [`docs/DEPLOY.md`](./docs/DEPLOY.md#dados-analíticos-na-vps) e
+Os dados do globo e do painel vêm da trilha global: o agregado
+`data/db/aggregates.sqlite` (DuckDB) e os CSVs originais, persistidos no volume
+`api_data`. O runbook está em
+[`docs/DEPLOY.md`](./docs/DEPLOY.md#dados-analíticos-na-vps) e
 [`docs/GLOBAL.md`](./docs/GLOBAL.md).
 
 ## CI/CD e deploy na VPS

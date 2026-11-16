@@ -151,6 +151,13 @@ jobs:
             cd ~/dev/carcara-orbit
             trap 'rm -f .env' EXIT
 
+            # O SCP não apaga arquivos que saíram do repositório. Sobras em
+            # web/src são compiladas pelo `tsc -b` e quebram o build; limpe os
+            # untracked (o .env é recriado logo abaixo).
+            if [ -d .git ]; then
+              git -c safe.directory="$PWD" clean -fd
+            fi
+
             # Write .env from GitHub secrets (single-quoted to prevent expansion).
             {
               printf 'NODE_ENV=%s\n'              'production'

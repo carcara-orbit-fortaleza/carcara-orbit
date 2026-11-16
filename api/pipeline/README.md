@@ -1,3 +1,5 @@
+**English** · [Português](README.pt-BR.md)
+
 # Carcará pipeline worker
 
 Standalone Node.js worker inside the NestJS project. It owns the heavy data work:

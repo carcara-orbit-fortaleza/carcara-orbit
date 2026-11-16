@@ -1,3 +1,5 @@
+**English** · [Português](REAL-DATA.pt-BR.md)
+
 # Real data and NRT API (DEV-09)
 
 This NestJS project serves the existing mock API and now also supports real FIRMS

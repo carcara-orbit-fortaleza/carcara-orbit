@@ -1,3 +1,5 @@
+**English** · [Português](PIPELINE.pt-BR.md)
+
 # Harmonization pipeline
 
 This document describes the data pipeline implemented in `src/pipeline/`.

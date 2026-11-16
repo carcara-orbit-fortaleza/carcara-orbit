@@ -1,4 +1,6 @@
-# POST /api/explain (nivel 3 do "?")
+**English** · [Português](EXPLAIN.pt-BR.md)
+
+# POST /api/explain (level 3 of the "?")
 
 Explains ONE dashboard data point with a language model, grounded only in the
 `ExplainContext` sent by the web app (contract: `web/src/painel/explain/types.ts`,

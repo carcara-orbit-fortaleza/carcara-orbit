@@ -1,3 +1,5 @@
+**English** · [Português](README.pt-BR.md)
+
 # Fixtures
 
 These CSVs are synthetic and exist only to smoke-test the pipeline and NRT merge

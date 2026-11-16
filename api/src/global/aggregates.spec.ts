@@ -172,5 +172,6 @@ describe('GlobalService aggregates', () => {
     expect(result.features[0].geometry.coordinates).toEqual([-57, -17.8]);
     expect(result.features[0].properties.region_name).toBe('30°S 60°W');
     expect(result.features[0].properties.sensor).toBe('VIIRS');
+    expect(result.features[0].properties.harmonized_weight).toBe(0.5);
   });
 });

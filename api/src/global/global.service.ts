@@ -212,6 +212,7 @@ interface AggregatePointRow {
   method_version: string | null;
   region_name: string | null;
   region_biome: string | null;
+  calibration_factor: number | null;
 }
 
 function parseJson<T>(value: string | null): T | null {
@@ -1031,9 +1032,12 @@ export class GlobalService {
       );
       const rows = db
         .prepare(
-          `SELECT r.*, c.name AS region_name, c.biome AS region_biome
+          `SELECT r.*, c.name AS region_name, c.biome AS region_biome,
+                  cal.factor AS calibration_factor
            FROM recent_points r
            LEFT JOIN cells c ON c.id = r.cell_id
+           LEFT JOIN calibration cal
+             ON cal.cell_id = r.cell_id AND cal.month = r.month
            WHERE ${clause}
            ORDER BY r.ts_ms DESC
            LIMIT ?`,
@@ -1064,7 +1068,10 @@ export class GlobalService {
           frp_mw: row.frp_mw,
           daynight: row.daynight,
           qa_flag: row.qa_flag,
-          harmonized_weight: 1,
+          harmonized_weight:
+            row.sensor === 'MODIS'
+              ? 1
+              : round(1 / (row.calibration_factor || 1), 3),
           hotspot_count: 1,
           method_version: row.method_version ?? 'h1.0',
         },

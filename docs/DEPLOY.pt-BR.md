@@ -327,6 +327,10 @@ novamente; ele lê a camada automaticamente e as contagens de 2026 deixam de
 ficar zeradas. Remova `current/` quando o arquivo anual daquele ano estiver
 disponível para evitar contagem dupla.
 
+A API Area do FIRMS tem limite de 5000 transações por intervalo de 10 minutos; um
+request mundial de 5 dias conta como várias transações. O job controla o ritmo,
+espera 10 minutos ao atingir o limite e pula blocos já baixados na retomada.
+
 ### Agregado global (DuckDB)
 
 Depois do download, gere o agregado compacto em um container isolado (não

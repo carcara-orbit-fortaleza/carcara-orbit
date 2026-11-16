@@ -329,6 +329,10 @@ reads the overlay automatically and 2026 counts stop being zero. Remove the
 `current/` directory once the yearly archive for that year is available to avoid
 double counting.
 
+The FIRMS Area API limit is 5000 transactions per 10-minute interval; a world
+5-day request counts as several transactions. The job paces requests, waits 10
+minutes when the limit is hit and skips chunks already on disk when resumed.
+
 ### Global aggregate (DuckDB)
 
 After the download, build the compact aggregate in an isolated container (it does

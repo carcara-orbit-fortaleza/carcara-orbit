@@ -108,6 +108,16 @@ export function dashboardForPolygon(
   const sensor = sensorMix(calendar.rawModis, calendar.rawViirs)
   const active = calendar.weights.filter((weight) => weight.weight > 0)
   const weightSum = active.reduce((sum, weight) => sum + weight.weight, 0)
+  const named = active
+    .slice()
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 4)
+    .map((weight) => weight.name)
+  const biome = named.length === 0
+    ? ''
+    : active.length > named.length
+      ? `${named.join(' · ')} +${active.length - named.length}`
+      : named.join(' · ')
   const factor = weightSum === 0 ? 1 : active.reduce((sum, weight) => sum + weight.weight * factorOf(regions, weight.id), 0) / weightSum
   const uncertainties = active.map((weight) => ({ weight: weight.weight, value: uncertaintyOf(regions, weight.id) }))
   const uncertainty = weightSum === 0 || uncertainties.some((item) => item.value === null)
@@ -118,7 +128,7 @@ export function dashboardForPolygon(
 
   return {
     name: text.t('panelPolygonName'),
-    biome: active.map((weight) => weight.name).join(' · '),
+    biome,
     insights: polygonInsights(active, currentAnomaly, hotspotInside, currentYear, currentMonthsLabel, hotspotWindowLabel, text),
     confidence: 'estimated',
     factor,

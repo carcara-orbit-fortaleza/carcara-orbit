@@ -318,11 +318,12 @@ export async function loadWorkspace(): Promise<Workspace> {
   if (years.length === 0 || months.length === 0) throw new ApiError(404, 'panelErrNoCalendars')
 
   const meta = aggregateMeta(aggregate)
-  // O painel/navegação usa as células mais ativas; a API mantém todas as
-  // células no agregado para consultas por AOI/exportação.
-  const regions = cells
-    .slice(0, GLOBAL_REGION_LIMIT)
-    .map((cell) => regionSeriesFrom(cell, years, months, meta))
+  // Chips/calculadora/mapa pesado usam as células mais ativas; o recorte por
+  // AOI usa a grade completa (a API já devolve todas as células).
+  const allRegions = cells.map((cell) =>
+    regionSeriesFrom(cell, years, months, meta),
+  )
+  const regions = allRegions.slice(0, GLOBAL_REGION_LIMIT)
 
   return {
     years,
@@ -330,6 +331,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     disclaimer: aggregate.disclaimer ?? '',
     hotspots: [],
     regions,
+    allRegions,
     meta,
   }
 }

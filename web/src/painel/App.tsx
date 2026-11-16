@@ -139,7 +139,7 @@ export default function App() {
   const hotspotRange = currentYear === null ? null : hotspotWindow(currentYear)
   const hotspotWindowLabel = hotspotRange ? `${hotspotRange.from}–${hotspotRange.to}` : ''
   const calendar = useMemo(
-    () => (data && region && context ? filterCalendar(data.regions, data.years, polygon, region.id, context.baseline) : null),
+    () => (data && region && context ? filterCalendar(data.allRegions ?? data.regions, data.years, polygon, region.id, context.baseline) : null),
     [data, polygon, region, context],
   )
   const insideHotspots = useMemo(() => {
@@ -149,7 +149,7 @@ export default function App() {
   }, [hotspots, polygon, region])
   const board = useMemo(() => {
     if (!data || !region || !calendar || !context) return null
-    if (polygon) return dashboardForPolygon(calendar, data.regions, insideHotspots.length, context, hotspotWindowLabel, text)
+    if (polygon) return dashboardForPolygon(calendar, data.allRegions ?? data.regions, insideHotspots.length, context, hotspotWindowLabel, text)
     return dashboardForRegion(region, context, text)
   }, [calendar, context, data, hotspotWindowLabel, insideHotspots.length, polygon, region, text])
 
@@ -208,14 +208,14 @@ export default function App() {
         dashboard: board,
         region,
         calendar,
-        regions: data.regions,
+        regions: data.allRegions ?? data.regions,
         polygonActive: polygon !== null,
       }
       return {
         context: build(explainData),
         labelVars,
         whatIf: polygon
-          ? polygonRunner({ regions: data.regions, years: data.years, polygon, context, hotspotInside: insideHotspots.length, text })
+          ? polygonRunner({ regions: data.allRegions ?? data.regions, years: data.years, polygon, context, hotspotInside: insideHotspots.length, text })
           : undefined,
       }
     }
@@ -442,7 +442,7 @@ export default function App() {
             {/* Mapa logo acima da calculadora: clicar numa área acesa atualiza o bloco "Local selecionado" logo abaixo. */}
             <section className="grid-bottom">
               <FireMap3D
-                regions={data.regions}
+                regions={data.allRegions ?? data.regions}
                 hotspots={hotspots}
                 polygon={polygon}
                 focusRing={region.ring}

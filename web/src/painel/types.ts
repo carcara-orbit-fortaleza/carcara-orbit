@@ -84,7 +84,10 @@ export type DatasetMeta = {
 export type Workspace = {
   years: number[]
   months: string[]
+  /** Células exibidas nos chips/calculadora/mapa de calor (as mais ativas). */
   regions: RegionSeries[]
+  /** Grade completa, usada apenas no recorte por AOI/polígono. */
+  allRegions?: RegionSeries[]
   hotspots: Hotspot[]
   disclaimer: string
   meta: DatasetMeta

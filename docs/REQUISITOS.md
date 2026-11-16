@@ -1,201 +1,212 @@
-# Adequação aos requisitos do desafio
+**English** · [Português](REQUISITOS.pt-BR.md)
 
-Auditoria feita sobre o estado do monorepo após a integração de `api/` e `web/`,
-a entrada do Postgres e a estrutura de CI/CD.
+# Challenge requirements compliance
 
-> **Escopo desta entrega:** infraestrutura, banco, CI/CD, ingestão global na API
-> e verificação. Nenhuma alteração de layout foi feita em `web/`.
+Audit of the monorepo after integrating `api/` and `web/`, adding Postgres and
+the CI/CD structure.
 
-## Resumo executivo
+> **Scope of this delivery:** infrastructure, database, CI/CD, the global API
+> ingestion, the global aggregate and the dashboard integration.
 
-| Tema | Situação |
+## Executive summary
+
+| Topic | Status |
 | --- | --- |
-| Harmonização MODIS × VIIRS | **Atendido no método** (calibração por célula/região, versão de método e pesos) |
-| Calendário de queimadas 2000–presente | **Atendido no contrato**, dependente da carga de dados reais |
-| Comparação com medianas históricas e anomalias | **Atendido** |
-| Exportação CSV | **Atendido** (calendário, focos e GeoJSON da AOI) |
-| Seleção de região e período | **Parcial** (regiões predefinidas, bbox na API, período limitado na UI) |
-| Cores acessíveis | **Parcial** (rampas existentes, sem auditoria WCAG formal) |
-| **Escopo global (histórico e solução)** | **Atendido na API**; web ainda Brasil (sem alteração de layout) e carga global é operacional |
-| Produção: Postgres, backup, health | **Atendido na infraestrutura**; série analítica ainda em SQLite |
-| CI/CD com deploy em VPS | **Atendido** (workflow + runbook) |
+| MODIS × VIIRS harmonization | **Met in the method** (cell/region calibration, method version and weights) |
+| 2000–present fire calendar | **Met** (historical aggregate 2000–2025 + current-year FIRMS overlay) |
+| Comparison with historical medians and anomalies | **Met** |
+| CSV export | **Met** (calendar, hotspots and AOI GeoJSON) |
+| Region and period selection | **Met for region/AOI**; the period selector is still limited to full series/10 years |
+| Accessible colors | **Partial** (existing ramps, no formal WCAG audit) |
+| **Global scope (history and solution)** | **Met in the API and dashboard**; global load is operational |
+| Production: Postgres, backup, health | **Met in the infrastructure**; the analytical series remains in SQLite/volume |
+| CI/CD with VPS deploy | **Met** (workflow + runbook) |
 
-## Matriz de requisitos
+## Requirements matrix
 
-### 1. Harmonizar MODIS e VIIRS em uma série consistente
+### 1. Harmonize MODIS and VIIRS into a consistent series
 
-**Atendido no pipeline.**
+**Met in the pipeline and in the global aggregate.**
 
-- `api/pipeline/src/pipeline/calibrate.js` calcula fatores de calibração
-  VIIRS/MODIS por célula, região, mês e período diurno/noturno, com shrinkage e
-  limites de segurança.
-- `api/pipeline/src/pipeline/aggregate.js` agrega detecções em clusters,
-  preserva `has_modis`/`has_viirs`, sensores, plataformas e fatores por região.
-- `api/src/hotspots/hotspots.service.ts` expõe `harmonized_weight`,
-  `method_version` e a contagem harmonizada por cluster.
-- A calibração é explícita e versionada (`h1.0`), o que permite reprocessar a
-  série quando o método mudar.
+- `api/pipeline/src/pipeline/calibrate.js` computes VIIRS/MODIS calibration
+  factors per cell, region, month and day/night period, with shrinkage and
+  safety limits.
+- `api/pipeline/src/pipeline/aggregate.js` aggregates detections into clusters
+  and preserves `has_modis`/`has_viirs`, sensors, platforms and per-region
+  factors.
+- `api/scripts/global_aggregate.py` computes factors per cell/month for the
+  global grid and stores MODIS, VIIRS, raw and harmonized counts.
+- `api/src/hotspots/hotspots.service.ts` exposes `harmonized_weight`,
+  `method_version` and the harmonized count per cluster.
+- Calibration is explicit and versioned (`h1.0`), so the series can be
+  reprocessed when the method changes.
 
-**Ressalva:** o método está implementado, mas a qualidade final depende de uma
-carga histórica completa (ver item 8).
+**Caveat:** the method is implemented; final quality depends on the data load and
+on the calibration window (2012–2025).
 
-### 2. Calendário de atividade de queimadas do início dos anos 2000 até hoje
+### 2. Fire activity calendar from the early 2000s to today
 
-**Atendido no contrato; parcial nos dados da instância.**
+**Met.**
 
-- O pipeline aceita `FIRMS_HISTORY_START_YEAR` (padrão `2000`) e
+- The pipeline accepts `FIRMS_HISTORY_START_YEAR` (default `2000`) and
   `BASELINE_START_YEAR`/`BASELINE_END_YEAR` (2003–2025).
-- `GET /api/calendar?region=&from=&to=` devolve matriz ano × mês, contagens
-  brutas MODIS/VIIRS, contagens harmonizadas e anomalias.
-- O dataset mock cobre 2000-01 a 2026-10 com 12 meses e 6 regiões.
-- O modo real é gerado por `npm run bootstrap`, `npm run pipeline` ou
-  `npm run nrt` e fica em `data/real/`.
+- `GET /api/calendar?region=&from=&to=` returns the year × month matrix, raw
+  MODIS/VIIRS counts, harmonized counts and anomalies.
+- `GET /api/global/aggregates` returns the harmonized matrices for every global
+  cell, from 2000 through the current year.
+- `api/scripts/fetch_current_year.py` fills the open year (2026) from the FIRMS
+  Area API; the aggregate reads it from `data/raw/global/current/`.
+- The mock dataset covers 2000-01 through 2026-10 with 12 months and 6 regions.
+- The real mode is generated by `npm run bootstrap`, `npm run pipeline` or
+  `npm run nrt` and lives in `data/real/`.
 
-**Ressalva:** a instância de produção só atende o requisito depois de executar
-a carga histórica. O repositório não versiona os CSVs baixados nem o SQLite
-(ambos ignorados pelo Git).
+**Caveat:** the current year is a year-to-date overlay; it is replaced when the
+yearly country archive for that year becomes available.
 
-### 3. Selecionar uma área de interesse e um intervalo de datas
+### 3. Select an area of interest and a date range
 
-**Parcial (backend global completo; UI limitada).**
+**Met for AOI; partial for arbitrary dates.**
 
-- A API aceita `bbox=west,south,east,north`, `region`, `sensor`, `from` e `to`
-  em `/api/hotspots` e `/api/export/hotspots.csv`.
-- `GET /api/global/calendar` e `/api/global/hotspots` aceitam **qualquer bbox
-  do mundo** ou uma célula da grade, resolvendo a limitação do dataset Brasil.
-- A web permite desenhar um polígono sobre o mapa e escolher entre regiões
-  predefinidas; o calendário é filtrado pela interseção do polígono com os
-  biomas.
-- O calendário na UI oferece apenas “série completa” ou “últimos 10 anos”;
-  não há seletor arbitrário de datas na interface.
-- `/api/calendar` (dataset Brasil) exige `region`; o equivalente global não.
+- The API accepts `bbox=west,south,east,north`, `region`, `sensor`, `from` and
+  `to` in `/api/hotspots` and `/api/export/hotspots.csv`.
+- `GET /api/global/calendar` and `/api/global/hotspots` accept **any bbox in the
+  world** or a grid cell.
+- The dashboard lets the user draw a polygon over the 3D map and choose between
+  preset regions; the calendar is filtered by the polygon intersection and uses
+  the complete 648-cell grid.
+- The dashboard period selector still offers only “full series” or “last 10
+  years”; there is no arbitrary date picker in the UI.
+- `/api/calendar` (Brazil dataset) requires `region`; the global equivalent does
+  not.
 
-**Lacuna:** a UI ainda não consome os endpoints globais nem oferece seletor
-livre de período; isso depende de mudança de layout, que não foi feita.
+**Gap:** an arbitrary date-range selector in the UI.
 
-### 4. Comparar o período atual com medianas históricas e anomalias
+### 4. Compare the current period with historical medians and anomalies
 
-**Atendido.**
+**Met.**
 
-- O pipeline gera `anomaly_pct` por ano/mês e `metrics` por região, incluindo
-  média de baseline, pico histórico, tendência por década e total do ano
-  corrente.
-- A web exibe anomalia do ano corrente, pico histórico, série anual,
-  climatologia mensal e calendário com rampa de anomalia.
-- O baseline e o período são explícitos nos metadados (`h1.0`, 2003–2025).
+- The pipeline generates `anomaly_pct` per year/month and `metrics` per region,
+  including baseline mean, historical peak, trend per decade and current-year
+  total.
+- The web shows the current-year anomaly, historical peak, annual series,
+  monthly climatology and a calendar with an anomaly ramp.
+- Baseline and period are explicit in the metadata (`h1.0`, 2003–2025).
 
-### 5. Exportar os resultados da busca
+### 5. Export the search results
 
-**Atendido.**
+**Met.**
 
-- `GET /api/export.csv?region=&from=&to=` exporta o calendário.
-- `GET /api/export/hotspots.csv?region=&from=&to=&sensor=&bbox=` exporta os
-  focos filtrados.
-- A web gera CSV do calendário, CSV dos focos visíveis e GeoJSON da AOI.
-- Arquivos usam BOM e `;` para compatibilidade com Excel em pt-BR.
+- `GET /api/export.csv?region=&from=&to=` exports the calendar.
+- `GET /api/export/hotspots.csv?region=&from=&to=&sensor=&bbox=` exports the
+  filtered hotspots.
+- The web generates calendar CSV, visible hotspot CSV and AOI GeoJSON.
+- Files use a BOM and `;` for Excel compatibility in pt-BR locales.
 
-### 6. Visualização acessível e intuitiva
+### 6. Accessible and intuitive visualization
 
-**Parcial.**
+**Partial.**
 
-- Existem rampas de cor para contagem e anomalia (`web/src/painel/lib/colors.ts`),
-  legenda e tabela de dados com `<caption>`.
-- Não há auditoria formal de contraste/WCAG, teste com leitores de tela ou
-  alternativa textual completa para todos os gráficos.
+- Color ramps exist for counts and anomalies (`web/src/painel/lib/colors.ts`),
+  with a legend and a data table using `<caption>`.
+- There is no formal contrast/WCAG audit, screen-reader test or complete textual
+  alternative for every chart.
 
-### 7. Escopo global (requisito explícito desta revisão)
+### 7. Global scope (an explicit requirement of this revision)
 
-**Atendido na API; parcial na experiência.**
+**Met in the API and dashboard.**
 
-A ingestão global foi implementada como uma trilha separada do dataset Brasil,
-sem alterar `web/`:
+The global track is separate from the Brazil dataset:
 
-| Camada | Implementação |
+| Layer | Implementation |
 | --- | --- |
-| Fonte histórica | Índice mundial `FIRMS` por país: 238 países, 10.095 CSVs, 2000–2025, ~43,5 GB |
-| Banco | `data/db/global.sqlite`, separado do `firms.sqlite` do Brasil |
-| Modelo | Grade mundial de 10° (648 células), configurável de 5° a 60°, com IDs, polígonos e centros |
-| Atribuição | `gridRegionAt()` resolve a célula por latitude/longitude sem varrer polígonos |
-| Clusters/calibração | Mesmos algoritmos do Brasil, com fatores VIIRS/MODIS por célula e mês |
-| NRT | `--current` consulta a janela atual em tiles globais (30° por padrão) |
-| API | `/api/global/status`, `/regions`, `/calendar`, `/hotspots`, exports e ingestão em background |
-| Operação | Checkpoints de download/importação, retomada, log e registro em `operation_runs` |
+| Historical source | FIRMS world country index: 238 countries, 10,095 CSVs, 2000–2025, ~43.5 GB |
+| Current year | FIRMS Area API, 5-day world chunks (SP + NRT), `data/raw/global/current/` |
+| Analytical store | `data/db/aggregates.sqlite` (cell × year × month × sensor, calibration, recent sample) |
+| Model | 10° world grid (648 cells), configurable from 5° to 60°, with IDs, polygons and centers |
+| Assignment | `gridRegionAt()` resolves the cell by latitude/longitude without scanning polygons |
+| Calibration | VIIRS/MODIS factors per cell and month |
+| Legacy store | `data/db/global.sqlite`, separate from Brazil's `firms.sqlite` |
+| NRT | `--current` fetches the current window in global tiles (30° default) |
+| API | `/api/global/status`, `/aggregates`, `/regions`, `/calendar`, `/hotspots`, exports and background ingestion |
+| Dashboard | 3D map, global calendar, anomaly/climatology charts, AOI polygon, CSV export |
+| Operations | Download/import checkpoints, resume, logs and `operation_runs` records |
 
-Recursos disponíveis globalmente:
+Global features:
 
-- `POST /api/global/ingest` dispara a carga histórica mundial ou um piloto
+- `POST /api/global/ingest` starts the worldwide historical load or a pilot
   (`maxFiles`, `maxImportFiles`, `dryRun`).
-- `GET /api/global/calendar?region=g_...` ou `?bbox=...` devolve o calendário
-  harmonizado para qualquer célula ou área do planeta.
-- `GET /api/global/hotspots?bbox=...` e os exports CSV atendem qualquer AOI.
-- `POST /api/global/ingest` com `includeCurrent=true` atualiza o ano corrente
-  pela API NRT.
+- `GET /api/global/aggregates` returns every cell's harmonized matrices; the
+  dashboard uses the 24 most active cells in the chips/calculator and the full
+  grid for AOI.
+- `GET /api/global/calendar?region=g_...` or `?bbox=...` returns the harmonized
+  calendar for any cell or area.
+- `GET /api/global/hotspots?bbox=...` and the CSV exports serve any AOI.
+- `api/scripts/fetch_current_year.py` fills the open year through the FIRMS API.
 
-Limitações que permanecem:
+Remaining limitations:
 
-1. **Web**: a interface continua com `BRAZIL_BBOX`, mapa centrado no Brasil e
-   seis biomas. Por instrução, nenhuma alteração de layout foi feita.
-2. **Dados**: a carga global não roda automaticamente no deploy; a operação
-   precisa executar o job (dezenas de GB) e acompanhar `/api/global/status`.
-3. **Escala**: a série analítica ainda está em SQLite; para consultas
-   concorrentes/particionadas em escala global, o próximo passo é PostGIS.
-4. **Cobertura**: o índice histórico cobre MODIS, VIIRS S-NPP e JPSS1/NOAA-20;
-   NOAA-21 entra via NRT.
+1. **Period selector:** the UI still offers only full series/10 years.
+2. **Data refresh:** the global load and the current-year job do not run
+   automatically on deploy; the operator runs them and watches
+   `/api/global/status`.
+3. **Scale:** the analytical series remains in SQLite; concurrent/partitioned
+   global queries are the next step (PostGIS).
+4. **Coverage:** the historical index includes MODIS, VIIRS S-NPP and
+   JPSS1/NOAA-20; NOAA-21 enters through NRT and the current-year overlay.
 
-O runbook está em [`GLOBAL.md`](./GLOBAL.md).
+The runbook is in [`GLOBAL.md`](./GLOBAL.md).
 
-### 8. Dados reais e operação em produção
+### 8. Real data and production operation
 
-**Parcial.**
+**Met for the current architecture.**
 
-- Existe pipeline de dados reais (histórico + NRT), scheduler e endpoints de
-  status/trigger.
-- O SQLite histórico (`data/db/firms.sqlite`) e os JSONs em `data/real/` são
-  persistentes no volume `api_data`.
-- Postgres foi adicionado para saúde, migrações e histórico operacional
-  (`operation_runs`, exposto em `/api/runs`, protegido por `ADMIN_TOKEN` quando
-  configurado), com backup diário em produção.
-- A ingestão global grava em `data/db/global.sqlite`, persistido no volume
-  `api_data`, e registra o job no Postgres.
-- A série analítica **ainda não está no Postgres**; essa migração é o próximo
-  passo para escala global e múltiplas réplicas.
+- A real-data pipeline exists (history + NRT), with a scheduler and
+  status/trigger endpoints.
+- The historical SQLite (`data/db/firms.sqlite`) and the JSON files in
+  `data/real/` are persisted in the `api_data` volume.
+- Postgres stores health, migrations and operational history (`operation_runs`,
+  exposed at `/api/runs`, protected by `ADMIN_TOKEN` when configured), with daily
+  backups in production.
+- The global aggregate is served from `data/db/aggregates.sqlite`, persisted in
+  the `api_data` volume; the legacy row-level ingestion still writes
+  `data/db/global.sqlite` and records the job in Postgres.
+- The analytical series is **not yet in Postgres**; that migration is the next
+  step for global scale and multiple replicas.
 
-### 9. Autenticação do painel
+### 9. Dashboard authentication
 
-**Não é requisito do desafio, mas é uma lacuna funcional do produto.**
+**Not a challenge requirement, but a product gap.**
 
-A web chama `/api/auth/login`, `/api/auth/me` e `/api/auth/logout`, mas a API
-atual não possui módulo de autenticação. O painel abre a tela de login e não
-consegue autenticar. Isso já existia antes desta entrega e não foi alterado.
+The web calls `/api/auth/login`, `/api/auth/me` and `/api/auth/logout`, but the
+current API has no authentication module. The dashboard opens the login screen
+and cannot authenticate. This predates the delivery and was not changed.
 
-### 10. Testes e qualidade
+### 10. Tests and quality
 
-**Atendido no que existe.**
+**Met for the existing suites.**
 
-- 14 testes unitários da API (`npm test`), incluindo a grade e consultas globais.
-- 30 testes do pipeline (`npm run pipeline:test`), incluindo ingestão global e NRT por tiles.
-- 15 casos e2e (`npm run test:e2e`), incluindo modo real, exportações e endpoints globais.
-- CI executa lint dos dois apps, build, testes unitários, testes do pipeline,
-  e2e, migrações em Postgres, smoke test da API e build das imagens Docker.
+- API unit tests (`npm test`): 48 tests, including the grid, global queries and
+  the aggregate contract.
+- Web unit tests (`npm test`): 87 tests.
+- Pipeline tests (`npm run pipeline:test`) and e2e tests (`npm run test:e2e`)
+  run in CI.
+- CI runs lint for both apps, build, unit tests, pipeline tests, e2e, Postgres
+  migrations, an API smoke test and the Docker image builds.
 
-## Roadmap sugerido (ordem de impacto)
+## Suggested roadmap (impact order)
 
-1. **Carga global operacional**: executar o job mundial na VPS em piloto, validar
-   cobertura por país e acompanhar disco/tempo; hoje a API está pronta, mas os
-   dados não são carregados automaticamente.
-2. **PostGIS + partições**: migrar hotspots/clusters globais para Postgres, com
-   índices espaciais e partições por ano, para consultas concorrentes em escala.
-3. **UI global** (quando houver autorização para alterar layout): mapa-múndi,
-   busca por coordenadas, seletor de período livre e uso dos endpoints globais.
-4. **Autenticação real** do painel (ou remoção da tela de login enquanto não
-   houver backend de auth).
+1. **Scheduled global refresh**: run the current-year job and the aggregate on a
+   schedule (cron/systemd timer) and alert on failures.
+2. **PostGIS + partitions**: migrate global hotspots/clusters to Postgres with
+   spatial indexes and yearly partitions for concurrent queries at scale.
+3. **Period selector**: add an arbitrary date-range picker to the dashboard.
+4. **Real authentication** for the dashboard (or remove the login screen while
+   there is no auth backend).
 
-## Conclusão
+## Conclusion
 
-O projeto atende ao núcleo metodológico do desafio — harmonização, calendário,
-anomalias e exportação — e agora tem base de produção com Postgres, backup,
-CI/CD e uma trilha de ingestão global na API. O escopo global está **atendido no
-backend** (histórico mundial por país, grade, calibração e consultas por AOI);
-o que falta é operacionalizar a carga completa e, quando permitido, expor essa
-capacidade na interface. A web permanece intencionalmente inalterada nesta
-entrega.
+The project meets the methodological core of the challenge — harmonization,
+calendar, anomalies and export — and now has a production base with Postgres,
+backups, CI/CD and an operational global track. The global scope is **met in the
+backend and in the dashboard**: worldwide history, grid, calibration, AOI
+queries and current-year data from the FIRMS API.

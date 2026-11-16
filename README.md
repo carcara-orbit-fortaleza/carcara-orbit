@@ -1,72 +1,76 @@
+**English** · [Português](README.pt-BR.md)
+
 # Carcará Orbit
 
-Monorepo do Carcará Orbit: painel e API de monitoramento de focos de calor.
-A web atual usa dados e regiões do Brasil; a API também oferece uma trilha de
-ingestão e consulta global (ver [`docs/GLOBAL.md`](./docs/GLOBAL.md) e
+Carcará Orbit monorepo: a fire hotspot monitoring panel and API. The current
+web app uses Brazilian data and regions; the API also exposes a global ingestion
+and query track (see [`docs/GLOBAL.md`](./docs/GLOBAL.md) and
 [`docs/REQUISITOS.md`](./docs/REQUISITOS.md)).
 
-| Pasta | Stack | Descrição |
+| Folder | Stack | Description |
 | --- | --- | --- |
-| [`api/`](./api) | NestJS 12 · TypeScript · Node 24 | API de focos, calendário, regiões, exportação e pipeline FIRMS |
-| [`web/`](./web) | React 19 · Vite 7 · Tailwind 4 | Site público e painel (`/dashboard`) |
+| [`api/`](./api) | NestJS 12 · TypeScript · Node 24 | Hotspots, calendar, regions, export and FIRMS pipeline API |
+| [`web/`](./web) | React 19 · Vite 7 · Tailwind 4 | Public site and dashboard (`/dashboard`) |
 
-Os códigos originais viviam nos repositórios
-[carcara-api](https://github.com/carcara-orbit-fortaleza/carcara-api) e
-[carcara-web](https://github.com/carcara-orbit-fortaleza/carcara-web);
-este monorepo passa a ser a fonte única de verdade.
+The original code lived in the
+[carcara-api](https://github.com/carcara-orbit-fortaleza/carcara-api) and
+[carcara-web](https://github.com/carcara-orbit-fortaleza/carcara-web)
+repositories; this monorepo is now the single source of truth.
 
-A infraestrutura segue o padrão do [Baseware](https://github.com/platusforge/baseware):
-três arquivos de Compose (base, override de desenvolvimento e override de produção),
-Postgres 16 em container com backup diário e Dockerfiles multi-stage. Em produção,
-o nginx serve a SPA e faz proxy de `/api`; o Traefik que já roda na VPS termina o
-TLS e roteia o subdomínio para o `web`. O CI/CD faz verificação, build das imagens
-e deploy por SSH na VPS.
+The infrastructure follows the [Baseware](https://github.com/platusforge/baseware)
+pattern: three Compose files (base, development override and production
+override), Postgres 16 in a container with daily backups and multi-stage
+Dockerfiles. In production, nginx serves the SPA and proxies `/api`; the
+Traefik instance already running on the VPS terminates TLS and routes the
+subdomain to `web`. CI/CD verifies the code, builds the images and deploys over
+SSH to the VPS.
 
-## Como os dois se conectam
+## How the pieces connect
 
-- **Desenvolvimento:** o navegador chama a API em `http://localhost:3000/api`
-  (`VITE_API_URL`). A API libera a origem `http://localhost:5173` via `CORS_ORIGIN`
-  e aceita cookies de sessão (`credentials: true`).
-- **Produção:** o front é compilado com `VITE_API_URL=/api`, então todas as chamadas
-  são relativas e passam pelo nginx do serviço `web`, que encaminha `/api/*` para
-  `api:3000` na rede interna do Docker. A API **não** é publicada no host.
-- **Dados:** o globo da home e o painel consomem a trilha global
-  (`/api/global/hotspots`, `/api/global/aggregates`). O calendário vem do
-  agregado `data/db/aggregates.sqlite`; o SQLite linha a linha
-  (`data/db/global.sqlite`) atende os endpoints legados. Os endpoints
-  `/api/hotspots`, `/api/regions` e `/api/calendar` continuam disponíveis para
-  a trilha Brasil legada, controlada por `DATA_SOURCE`.
-- Os cookies de sessão do painel funcionam nos dois modos (CORS com credenciais em dev,
-  mesma origem em produção).
+- **Development:** the browser calls the API at `http://localhost:3000/api`
+  (`VITE_API_URL`). The API allows the `http://localhost:5173` origin through
+  `CORS_ORIGIN` and accepts session cookies (`credentials: true`).
+- **Production:** the frontend is built with `VITE_API_URL=/api`, so every call
+  is relative and goes through the `web` nginx, which forwards `/api/*` to
+  `api:3000` on the internal Docker network. The API is **not** published on the
+  host.
+- **Data:** the home globe and the dashboard consume the global track
+  (`/api/global/hotspots`, `/api/global/aggregates`). The calendar comes from
+  the `data/db/aggregates.sqlite` aggregate; the row-level SQLite database
+  (`data/db/global.sqlite`) serves the legacy endpoints. `/api/hotspots`,
+  `/api/regions` and `/api/calendar` remain available for the legacy Brazil
+  track, controlled by `DATA_SOURCE`.
+- Dashboard session cookies work in both modes (CORS with credentials in dev,
+  same origin in production).
 
 ## Quickstart (Docker)
 
-Pré-requisitos: Docker Desktop com Compose v2.
+Requirements: Docker Desktop with Compose v2.
 
 ```bash
 cp .env.example .env
-# edite .env (DB_PASSWORD, FIRMS_MAP_KEY, portas, etc.)
+# edit .env (DB_PASSWORD, FIRMS_MAP_KEY, ports, etc.)
 docker compose up --build
 ```
 
-| Serviço | URL |
+| Service | URL |
 | --- | --- |
 | Web | http://localhost:5173 |
 | API (health) | http://localhost:3000/api/health |
 | API (meta) | http://localhost:3000/api/meta |
 | API (global) | http://localhost:3000/api/global/status |
-| API (execuções) | http://localhost:3000/api/runs (admin quando `ADMIN_TOKEN` está definido) |
-| Postgres | `localhost:5432` (somente dev) |
+| API (runs) | http://localhost:3000/api/runs (admin when `ADMIN_TOKEN` is set) |
+| Postgres | `localhost:5432` (development only) |
 
-O Compose de desenvolvimento usa bind mount e hot reload nos dois serviços. O
-entrypoint da API aplica as migrações do Postgres automaticamente. O globo e o
-painel usam a trilha global; para popular os dados no dev:
+The development Compose uses bind mounts and hot reload for both services. The
+API entrypoint applies the Postgres migrations automatically. The globe and the
+dashboard use the global track; to populate data in development:
 
 ```bash
-# 1. baixa os CSVs históricos (piloto)
+# 1. download the historical CSVs (pilot)
 docker compose exec -T api npm run global -- --countries all --max-files 20 --grid 10
 
-# 2. gera o agregado com DuckDB (ver docs/GLOBAL.md)
+# 2. build the DuckDB aggregate (see docs/GLOBAL.md)
 docker run --rm --ulimit nofile=65536:65536 \
   -v carcara-orbit_api_data:/data \
   -v "$PWD/api/scripts:/scripts:ro" \
@@ -76,115 +80,117 @@ docker run --rm --ulimit nofile=65536:65536 \
     --out /data/db/aggregates.sqlite --tmp /data/db/duckdb-tmp'
 ```
 
-Sem o agregado, o painel informa que a grade global ainda não tem dados.
-`DATA_SOURCE=mock` afeta apenas os endpoints legados do Brasil.
+Without the aggregate, the dashboard reports that the global grid has no data.
+`DATA_SOURCE=mock` only affects the legacy Brazil endpoints.
 
 ### Postgres
 
-- Serviço `db` (`postgres:16-alpine`) com volume `postgres_data`, healthcheck e
-  rede interna.
-- `DATABASE_URL` é montada a partir de `DB_USER`/`DB_PASSWORD`/`DB_NAME`
-  (credenciais percent-encoded).
-- Migrações ficam em [`api/db/migrations`](./api/db/migrations) e são aplicadas
-  pelo entrypoint ou por `docker compose exec api npm run db:migrate`.
-- A tabela `operation_runs` registra execuções de pipeline/NRT/modo e alimenta
-  `GET /api/runs`. A série analítica de focos continua em SQLite/`data/real`
-  nesta fase; a migração para Postgres/PostGIS está no roadmap.
-- Em produção há backup diário no serviço `db-backup` (volume
-  `postgres_backups`). Runbook em [`docs/DEPLOY.md`](./docs/DEPLOY.md).
+- `db` service (`postgres:16-alpine`) with the `postgres_data` volume, a
+  healthcheck and an internal network.
+- `DATABASE_URL` is assembled from `DB_USER`/`DB_PASSWORD`/`DB_NAME`
+  (percent-encoded credentials).
+- Migrations live in [`api/db/migrations`](./api/db/migrations) and are applied
+  by the entrypoint or by `docker compose exec api npm run db:migrate`.
+- The `operation_runs` table records pipeline/NRT/mode runs and feeds
+  `GET /api/runs`. The analytical hotspot series remains in SQLite/`data/real`
+  at this stage; migration to Postgres/PostGIS is on the roadmap.
+- Production has a daily backup in the `db-backup` service (`postgres_backups`
+  volume). Runbook in [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
-### Dados reais (NASA FIRMS)
+### Real data (NASA FIRMS)
 
-1. Obtenha uma `FIRMS_MAP_KEY` em <https://firms.modaps.eosdis.nasa.gov/api/map_key/>.
-2. Preencha `FIRMS_MAP_KEY` no `.env`.
-3. Para o modo real, defina `DATA_SOURCE=real` ou use
-   `docker compose exec api npm run bootstrap` para baixar/importar o histórico.
+1. Get a `FIRMS_MAP_KEY` at <https://firms.modaps.eosdis.nasa.gov/api/map_key/>.
+2. Set `FIRMS_MAP_KEY` in `.env`.
+3. For real mode, set `DATA_SOURCE=real` or run
+   `docker compose exec api npm run bootstrap` to download/import the history.
 
-O diretório `api/data` é o volume de trabalho do pipeline (`raw`, `real`, `db`,
-`runtime`) e é persistido no volume `api_data` em produção. Detalhes em
-[`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) e
+The `api/data` directory is the pipeline working volume (`raw`, `real`, `db`,
+`runtime`) and is persisted in the `api_data` volume in production. Details in
+[`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) and
 [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md).
 
-## Ingestão global (API)
+## Global ingestion (API)
 
-A API possui uma trilha global separada do dataset Brasil usado pela web:
+The API has a global track separate from the Brazil dataset used by the web:
 
-- baixa o histórico mundial da FIRMS (238 países, ~10 mil CSVs, ~43,5 GB);
-- agrega os CSVs com DuckDB em `data/db/aggregates.sqlite` (célula × ano × mês ×
-  sensor, calibração e amostra recente), sem importar 1 bilhão de linhas;
-- atribui cada foco a uma grade mundial (padrão 10°, 648 células);
-- expõe o agregado completo, focos e CSV em `/api/global/*`;
-- usa a disponibilidade do FIRMS para saber o ano corrente (NRT);
-- opcionalmente mantém a trilha linha a linha legada em `global.sqlite`.
+- downloads the worldwide FIRMS history (238 countries, ~10k CSVs, ~43.5 GB);
+- aggregates the CSVs with DuckDB into `data/db/aggregates.sqlite` (cell × year ×
+  month × sensor, calibration and a recent sample), without importing 1 billion
+  rows;
+- assigns every hotspot to a world grid (10° default, 648 cells);
+- exposes the complete aggregate, hotspots and CSV under `/api/global/*`;
+- uses FIRMS availability to find the current year (NRT), and can fetch that
+  year in 5-day chunks with `api/scripts/fetch_current_year.py`;
+- optionally keeps the legacy row-level track in `global.sqlite`.
 
 ```bash
-# Plano (não baixa)
+# Plan (downloads nothing)
 docker compose exec api npm run global -- --dry-run --countries all --grid 10
 
-# Piloto com 20 arquivos
+# Pilot with 20 files
 docker compose exec api npm run global -- --countries all --max-files 20
 
-# Carga histórica completa (depois rode o agregado DuckDB)
+# Full historical load (then run the DuckDB aggregate)
 docker compose exec api npm run global -- --countries all
 ```
 
-Endpoints principais:
+Main endpoints:
 
-| Rota | Descrição |
+| Route | Description |
 | --- | --- |
-| `GET /api/global/status` | cobertura, grade, calibração e status do job |
-| `GET /api/global/aggregates` | agregado harmonizado de todas as células |
-| `GET /api/global/calendar?region=&bbox=&from=&to=` | calendário global harmonizado (legado) |
-| `GET /api/global/hotspots?region=&bbox=&from=&to=&sensor=` | focos globais |
-| `GET /api/global/export/hotspots.csv?...` | CSV global |
-| `POST /api/global/ingest` | dispara a ingestão em background (admin) |
-| `GET /api/global/ingest/status` | progresso do job |
+| `GET /api/global/status` | coverage, grid, calibration and job status |
+| `GET /api/global/aggregates` | harmonized aggregate for every cell |
+| `GET /api/global/calendar?region=&bbox=&from=&to=` | harmonized global calendar (legacy) |
+| `GET /api/global/hotspots?region=&bbox=&from=&to=&sensor=` | global hotspots |
+| `GET /api/global/export/hotspots.csv?...` | global CSV |
+| `POST /api/global/ingest` | starts ingestion in the background (admin) |
+| `GET /api/global/ingest/status` | job progress |
 
-A base global é independente do dataset Brasil: a web e suas seis regiões
-continuam funcionando sem alterações. O runbook completo está em
+The global base is independent from the Brazil dataset: the web and its six
+regions keep working unchanged. The full runbook is in
 [`docs/GLOBAL.md`](./docs/GLOBAL.md).
 
-## Produção
+## Production
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Antes de subir:
+Before bringing it up:
 
-- aponte o DNS de `APP_HOST` para o servidor;
-- defina `DB_PASSWORD`, `APP_HOST` e `TRAEFIK_*` no `.env` (veja
-  [`docs/DEPLOY.md`](./docs/DEPLOY.md#proxy-reverso-traefik-da-vps));
-- conecte o `web` à rede do Traefik que já atende `80/443` na VPS.
+- point the `APP_HOST` DNS record at the server;
+- set `DB_PASSWORD`, `APP_HOST` and `TRAEFIK_*` in `.env` (see
+  [`docs/DEPLOY.md`](./docs/DEPLOY.md#reverse-proxy-vps-traefik));
+- connect `web` to the Traefik network already serving `80/443` on the VPS.
 
-O Traefik da VPS termina o TLS e encaminha para o nginx do `web` pela rede
-compartilhada. O nginx serve os assets da SPA e faz proxy de `/api` para o
-serviço `api`, que permanece inacessível diretamente pela internet. O Postgres
-não publica porta no host e roda com backup diário.
+The VPS Traefik terminates TLS and forwards to the `web` nginx over the shared
+network. nginx serves the SPA assets and proxies `/api` to the `api` service,
+which remains unreachable from the internet. Postgres does not publish a host
+port and runs with daily backups.
 
-Os dados do globo e do painel vêm da trilha global: o agregado
-`data/db/aggregates.sqlite` (DuckDB) e os CSVs originais, persistidos no volume
-`api_data`. O runbook está em
-[`docs/DEPLOY.md`](./docs/DEPLOY.md#dados-analíticos-na-vps) e
+The globe and dashboard data come from the global track: the
+`data/db/aggregates.sqlite` aggregate (DuckDB) and the original CSVs, persisted
+in the `api_data` volume. The runbook is in
+[`docs/DEPLOY.md`](./docs/DEPLOY.md#analytical-data-on-the-vps) and
 [`docs/GLOBAL.md`](./docs/GLOBAL.md).
 
-## CI/CD e deploy na VPS
+## CI/CD and VPS deploy
 
-O workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml):
+The [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) workflow:
 
-1. valida API e web (lint, build, testes unitários e do pipeline);
-2. sobe um Postgres de serviço, aplica migrações e testa `/api/health`;
-3. valida os Compose e constrói as imagens Docker;
-4. com a variável `DEPLOY_ENABLED=true`, copia o repo para
-   `~/dev/carcara-orbit`, escreve o `.env` a partir dos secrets e das variáveis
-   `TRAEFIK_*`, sobe o Compose de produção, confere a saúde e remove o `.env`.
+1. validates API and web (lint, build, unit and pipeline tests);
+2. starts a Postgres service, applies migrations and tests `/api/health`;
+3. validates the Compose files and builds the Docker images;
+4. with `DEPLOY_ENABLED=true`, copies the repo to `~/dev/carcara-orbit`, writes
+   `.env` from the secrets and `TRAEFIK_*` variables, brings up the production
+   Compose stack, checks health and removes `.env`.
 
-Secrets e passos detalhados: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
+Secrets and detailed steps: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
-## Desenvolvimento sem Docker
+## Development without Docker
 
 ```bash
-# Postgres (opcional; sem ele a API sobe com persistência desativada)
+# Postgres (optional; without it the API starts with persistence disabled)
 docker compose up -d db
 
 # API
@@ -194,35 +200,36 @@ DATABASE_URL=postgresql://carcara:change-me-strong-password@localhost:5432/carca
   npm run db:migrate
 npm run start:dev        # http://localhost:3000/api
 
-# Web (outro terminal)
+# Web (another terminal)
 cd web
 npm ci
 npm run dev              # http://localhost:5173
 ```
 
-## Scripts úteis
+## Useful scripts
 
-| Comando | O que faz |
+| Command | What it does |
 | --- | --- |
-| `docker compose up --build` | Sobe dev com hot reload |
-| `docker compose logs -f api` | Acompanha os logs da API |
-| `docker compose exec api npm run bootstrap` | Baixa/importa o histórico FIRMS do Brasil |
-| `docker compose exec api npm run global -- --dry-run --countries all` | Plano da ingestão mundial |
-| `docker compose exec api npm run global -- --countries all --max-files 20` | Piloto da ingestão mundial |
-| `docker compose exec api npm run pipeline` | Roda o pipeline histórico |
-| `docker compose exec api npm run db:migrate` | Aplica migrações pendentes |
-| `docker compose exec api npm test` | Testes unitários da API |
-| `docker compose exec api npm run pipeline:test` | Testes do pipeline |
-| `docker compose exec web npm run lint` | Lint do front |
+| `docker compose up --build` | Starts development with hot reload |
+| `docker compose logs -f api` | Follows the API logs |
+| `docker compose exec api npm run bootstrap` | Downloads/imports the Brazil FIRMS history |
+| `docker compose exec api npm run global -- --dry-run --countries all` | Plans the worldwide ingestion |
+| `docker compose exec api npm run global -- --countries all --max-files 20` | Worldwide ingestion pilot |
+| `docker compose exec api npm run pipeline` | Runs the historical pipeline |
+| `docker compose exec api npm run db:migrate` | Applies pending migrations |
+| `docker compose exec api npm test` | API unit tests |
+| `docker compose exec api npm run pipeline:test` | Pipeline tests |
+| `docker compose exec web npm run lint` | Frontend lint |
 
-## Documentação
+## Documentation
 
-- [`docs/GLOBAL.md`](./docs/GLOBAL.md) — ingestão global, grade, endpoints e operação.
-- [`docs/REQUISITOS.md`](./docs/REQUISITOS.md) — aderência ao desafio e roadmap.
-- [`docs/DEPLOY.md`](./docs/DEPLOY.md) — VPS, secrets, migrações, backup/restore.
-- [`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) — dados reais e NRT.
-- [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md) — pipeline FIRMS.
+- [`docs/GLOBAL.md`](./docs/GLOBAL.md) — global ingestion, grid, endpoints and operations.
+- [`docs/REQUISITOS.md`](./docs/REQUISITOS.md) — challenge compliance and roadmap.
+- [`docs/DEPLOY.md`](./docs/DEPLOY.md) — VPS, secrets, migrations, backup/restore.
+- [`docs/apresentacao/README.md`](./docs/apresentacao/README.md) — project presentation (EN/PT).
+- [`api/docs/REAL-DATA.md`](./api/docs/REAL-DATA.md) — real data and NRT.
+- [`api/pipeline/docs/PIPELINE.md`](./api/pipeline/docs/PIPELINE.md) — FIRMS pipeline.
 
-## Licença
+## License
 
-Projeto privado da Carcará Orbit Fortaleza.
+Private project of Carcará Orbit Fortaleza.

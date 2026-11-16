@@ -37,6 +37,7 @@ services:
       - DATA_SOURCE=${DATA_SOURCE:-mock}
       - REGIONS_FILE=${REGIONS_FILE:-}
       - GLOBAL_DB_PATH=${GLOBAL_DB_PATH:-./data/db/global.sqlite}
+      - AGGREGATES_DB_PATH=${AGGREGATES_DB_PATH:-./data/db/aggregates.sqlite}
       - GLOBAL_RAW_DIR=${GLOBAL_RAW_DIR:-./data/raw/global}
       - GLOBAL_GRID_DEGREES=${GLOBAL_GRID_DEGREES:-10}
       - GLOBAL_NRT_TILE_DEGREES=${GLOBAL_NRT_TILE_DEGREES:-30}

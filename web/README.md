@@ -1,73 +1,71 @@
-# React + TypeScript + Vite
+**English** · [Português](README.pt-BR.md)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Carcará Orbit web
 
-Currently, two official plugins are available:
+React 19 + Vite 7 + Tailwind 4 single-page app for the public site and the fire
+monitoring dashboard.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Routes
 
-## React Compiler
+| Route | Description |
+| --- | --- |
+| `/` | Public site with the 3D globe and recent hotspots |
+| `/dashboard` | Global dashboard: calendar, anomalies, 3D map, chance grid, risk calculator and CSV/AOI exports |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Data
 
-## Expanding the ESLint configuration
+The dashboard consumes the global API track:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `GET /api/global/aggregates` — every 10° grid cell with yearly/monthly
+  harmonized, MODIS and VIIRS matrices; loaded once and used for the calendar,
+  anomalies, chips and AOI;
+- `GET /api/global/hotspots` — recent hotspot sample for the map and globe;
+- `GET /api/health` — availability check.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The legacy Brazil endpoints (`/api/hotspots`, `/api/regions`, `/api/calendar`)
+remain available for the Brazil track.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Map and Content Security Policy
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The 3D map uses MapLibre with:
+
+- Esri World Imagery raster tiles from `https://server.arcgisonline.com`;
+- Mapzen/AWS terrain tiles from `https://s3.amazonaws.com`.
+
+MapLibre fetches raster and terrain tiles with `fetch`, so nginx must allow both
+hosts in `connect-src` and `img-src`, and allow the MapLibre blob worker with
+`worker-src 'self' blob:`. The policy lives in [`nginx.conf`](nginx.conf). If you
+add a new tile provider, update the CSP as well.
+
+## Development
+
+```bash
+npm ci
+npm run dev      # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`VITE_API_URL` defaults to `http://localhost:3000/api`. The production build uses
+`VITE_API_URL=/api`, so the browser calls the same origin and nginx proxies
+`/api` to the API service.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Vite development server |
+| `npm run build` | Type-check (`tsc -b`) and build the production bundle |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest unit tests |
+
+## Accessibility
+
+The dashboard uses color ramps with legends and data tables, but it has no formal
+WCAG audit yet. See [`../docs/REQUISITOS.md`](../docs/REQUISITOS.md) for the
+current status and roadmap.
+
+## More docs
+
+- [`../README.md`](../README.md) — monorepo overview.
+- [`../docs/GLOBAL.md`](../docs/GLOBAL.md) — global aggregate and endpoints.
+- [`../docs/DEPLOY.md`](../docs/DEPLOY.md) — production deploy and CSP notes.

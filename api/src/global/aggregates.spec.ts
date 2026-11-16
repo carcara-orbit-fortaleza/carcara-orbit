@@ -35,6 +35,14 @@ beforeAll(() => {
       raw_median REAL, cells INTEGER NOT NULL, region_factor REAL,
       confidence TEXT NOT NULL, PRIMARY KEY (cell_id, month)
     );
+    CREATE TABLE recent_points (
+      id TEXT PRIMARY KEY, cell_id TEXT NOT NULL, lat REAL NOT NULL,
+      lon REAL NOT NULL, date TEXT NOT NULL, ts_ms INTEGER NOT NULL,
+      year INTEGER NOT NULL, month INTEGER NOT NULL, sensor TEXT NOT NULL,
+      platform TEXT, instrument TEXT, resolution_m INTEGER, confidence INTEGER,
+      confidence_class TEXT, brightness_k REAL, frp_mw REAL, daynight TEXT,
+      qa_flag TEXT, source TEXT, method_version TEXT
+    );
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
   `);
   db.prepare('INSERT INTO cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
@@ -73,6 +81,32 @@ beforeAll(() => {
     12,
     2,
     'high',
+  );
+  db.prepare(
+    `INSERT INTO recent_points VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )`,
+  ).run(
+    'VIIRS-1',
+    'g_s30_w60',
+    -17.8,
+    -57,
+    '2025-09-15',
+    Date.UTC(2025, 8, 15, 12),
+    2025,
+    9,
+    'VIIRS',
+    'NOAA-20',
+    'VIIRS',
+    375,
+    90,
+    'high',
+    330.5,
+    12.5,
+    'D',
+    'ok',
+    'VIIRS_NOAA20_SP',
+    'h1.0',
   );
   const meta = db.prepare('INSERT INTO meta VALUES (?, ?)');
   for (const [key, value] of Object.entries({
@@ -125,5 +159,18 @@ describe('GlobalService aggregates', () => {
         true,
       );
     }
+  });
+
+  it('serves recent hotspots from the aggregate sample', () => {
+    const result = new GlobalService().hotspots({
+      region: 'g_s30_w60',
+      from: '2025',
+      to: '2025',
+      limit: '10',
+    });
+    expect(result.total).toBe(1);
+    expect(result.features[0].geometry.coordinates).toEqual([-57, -17.8]);
+    expect(result.features[0].properties.region_name).toBe('30°S 60°W');
+    expect(result.features[0].properties.sensor).toBe('VIIRS');
   });
 });

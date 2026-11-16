@@ -404,9 +404,14 @@ def main() -> int:
         return 1
 
     log("Gravando SQLite agregado...")
-    if os.path.exists(args.out):
-        os.remove(args.out)
-    db = sqlite3.connect(args.out)
+    # Grava em um arquivo temporário e troca atomicamente: a API pode estar
+    # lendo o agregado antigo enquanto o novo é gerado.
+    out_tmp = f"{args.out}.tmp"
+    for suffix in ("", "-wal", "-shm"):
+        stale = out_tmp + suffix
+        if os.path.exists(stale):
+            os.remove(stale)
+    db = sqlite3.connect(out_tmp)
     try:
         db.executescript(
             """
@@ -565,6 +570,19 @@ def main() -> int:
         db.commit()
     finally:
         db.close()
+
+    for suffix in ("-wal", "-shm"):
+        stale = out_tmp + suffix
+        if os.path.exists(stale):
+            os.remove(stale)
+    os.replace(out_tmp, args.out)
+    for suffix in ("-wal", "-shm"):
+        stale = args.out + suffix
+        if os.path.exists(stale):
+            try:
+                os.remove(stale)
+            except OSError:
+                pass
 
     elapsed = time.time() - start
     log(
